@@ -89,8 +89,8 @@ uint8_t VL53L8CX::WrMulti(
         i += current_write_size;
         if (size - i) {
 
-          // Flush buffer but do not send stop bit so we can keep going
-          p_platform->dev_i2c->endTransmission(false);
+          // Flush buffer and send stop bit so we have compatibility also with ESP32 platforms
+          p_platform->dev_i2c->endTransmission(true);
 
         }
       }
