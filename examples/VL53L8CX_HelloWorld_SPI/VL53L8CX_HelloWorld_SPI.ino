@@ -97,7 +97,7 @@ void setup()
   SerialPort.begin(460800);
 
   // Initialize SPI bus.
-  DEV_SPI.begin(CS_PIN);
+  DEV_SPI.begin();
 
   // Configure VL53L8CX component.
   sensor_vl53l8cx_top.begin();
