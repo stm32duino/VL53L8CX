@@ -106,7 +106,12 @@ class VL53L8CX {
       }
       if (_dev.platform.i2c_rst_pin >= 0) {
         pinMode(_dev.platform.i2c_rst_pin, OUTPUT);
-        digitalWrite(_dev.platform.i2c_rst_pin, LOW);
+        if (_dev.platform.dev_i2c) {
+          digitalWrite(_dev.platform.i2c_rst_pin, LOW);
+        }
+        if (_dev.platform.dev_spi) {
+          digitalWrite(_dev.platform.i2c_rst_pin, HIGH);
+        }
       }
 
       if (_dev.platform.dev_spi) {
@@ -165,7 +170,7 @@ class VL53L8CX {
      */
     virtual void vl53l8cx_i2c_reset(void)
     {
-      if (_dev.platform.i2c_rst_pin >= 0) {
+      if (_dev.platform.dev_i2c && _dev.platform.i2c_rst_pin >= 0) {
         digitalWrite(_dev.platform.i2c_rst_pin, LOW);
         delay(10);
         digitalWrite(_dev.platform.i2c_rst_pin, HIGH);
