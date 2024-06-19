@@ -268,7 +268,7 @@ void display_commands_banner(void)
   snprintf(report, sizeof(report),"%c[2H", 27); /* 27 is ESC command */
   SerialPort.print(report);
 
-  Serial.print("53L7A1 Simple Ranging demo application\n");
+  Serial.print("53L8A1 Simple Ranging demo application\n");
   Serial.print("--------------------------------------\n\n");
 
   Serial.print("Use the following keys to control application\n");
