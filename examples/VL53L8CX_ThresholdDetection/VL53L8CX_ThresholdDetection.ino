@@ -171,7 +171,7 @@ void print_result(VL53L8CX_ResultsData *Result)
 
   snprintf(report, sizeof(report),"%c[2H", 27); /* 27 is ESC command */
   SerialPort.print(report);
-  SerialPort.print("53L7A1 Threshold Detection demo application\n");
+  SerialPort.print("53L8A1 Threshold Detection demo application\n");
   SerialPort.print("-------------------------------------------\n\n");
   SerialPort.print("Cell Format :\n\n");
   
