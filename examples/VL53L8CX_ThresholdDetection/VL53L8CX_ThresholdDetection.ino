@@ -112,7 +112,7 @@ void setup()
   status = sensor_VL53L8CX_top.init();
 
   // Disable thresholds detection.
-  status = set_detection_thresholds_enable(0U);
+  status = sensor_VL53L8CX_top.set_detection_thresholds_enable(0U);
 
   // Set all values to 0.
   memset(&thresholds, 0, sizeof(thresholds));
