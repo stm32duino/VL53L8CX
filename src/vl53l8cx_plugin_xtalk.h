@@ -1,53 +1,33 @@
 /**
- ******************************************************************************
- * @file    vl53l8cx_plugin_xtalk.h
- * @author  STMicroelectronics
- * @version V1.0.0
- * @date    13 January 2023
- * @brief   Header file for the VL53L8CX xtalk structures.
- ******************************************************************************
- * @attention
- *
- * <h2><center>&copy; COPYRIGHT(c) 2021 STMicroelectronics</center></h2>
- *
- * Redistribution and use in source and binary forms, with or without modification,
- * are permitted provided that the following conditions are met:
- *   1. Redistributions of source code must retain the above copyright notice,
- *      this list of conditions and the following disclaimer.
- *   2. Redistributions in binary form must reproduce the above copyright notice,
- *      this list of conditions and the following disclaimer in the documentation
- *      and/or other materials provided with the distribution.
- *   3. Neither the name of STMicroelectronics nor the names of its contributors
- *      may be used to endorse or promote products derived from this software
- *      without specific prior written permission.
- *
- * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
- * AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
- * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
- * DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
- * FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
- * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
- * SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
- * CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
- * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
- * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
- *
- ******************************************************************************
- */
+  *
+  * Copyright (c) 2021 STMicroelectronics.
+  * All rights reserved.
+  *
+  * This software is licensed under terms that can be found in the LICENSE file
+  * in the root directory of this software component.
+  * If no LICENSE file comes with this software, it is provided AS-IS.
+  *
+  ******************************************************************************
+  */
 
 #ifndef VL53L8CX_PLUGIN_XTALK_H_
 #define VL53L8CX_PLUGIN_XTALK_H_
 
-#include "vl53l8cx_class.h"
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+
+#include "vl53l8cx_api.h"
 
 /**
  * @brief Inner internal number of targets.
  */
 
 #if VL53L8CX_NB_TARGET_PER_ZONE == 1
-  #define VL53L8CX_FW_NBTAR_XTALK 2
+#define VL53L8CX_FW_NBTAR_XTALK 2
 #else
-  #define VL53L8CX_FW_NBTAR_XTALK VL53L8CX_NB_TARGET_PER_ZONE
+#define VL53L8CX_FW_NBTAR_XTALK VL53L8CX_NB_TARGET_PER_ZONE
 #endif
 
 /**
@@ -56,6 +36,84 @@
 
 #define VL53L8CX_DCI_CAL_CFG        ((uint16_t)0x5470U)
 #define VL53L8CX_DCI_XTALK_CFG        ((uint16_t)0xAD94U)
+
+
+/**
+ * @brief This function starts the VL53L8CX sensor in order to calibrate Xtalk.
+ * This calibration is recommended is user wants to use a coverglass.
+ * @param (VL53L8CX_Configuration) *p_dev : VL53L8CX configuration structure.
+ * @param (uint16_t) reflectance_percent : Target reflectance in percent. This
+ * value is include between 1 and 99%. For a better efficiency, ST recommends a
+ * 3% target reflectance.
+ * @param (uint8_t) nb_samples : Nb of samples used for calibration. A higher
+ * number of samples means a higher accuracy, but it increases the calibration
+ * time. Minimum is 1 and maximum is 16.
+ * @param (uint16_t) distance_mm : Target distance in mm. The minimum allowed
+ * distance is 600mm, and maximum is 3000mm. The target must stay in Full FOV,
+ * so short distance are easier for calibration.
+ * @return (uint8_t) status : 0 if calibration OK, 127 if an argument has an
+ * incorrect value, or 255 is something failed.
+ */
+
+uint8_t vl53l8cx_calibrate_xtalk(
+  VL53L8CX_Configuration    *p_dev,
+  uint16_t      reflectance_percent,
+  uint8_t       nb_samples,
+  uint16_t      distance_mm);
+
+/**
+ * @brief This function gets the Xtalk buffer. The buffer is available after
+ * using the function vl53l8cx_calibrate_xtalk().
+ * @param (VL53L8CX_Configuration) *p_dev : VL53L5 configuration structure.
+ * @param (uint8_t) *p_xtalk_data : Buffer with a size defined by
+ * macro VL53L8CX_XTALK_SIZE.
+ * @return (uint8_t) status : 0 if buffer reading OK
+ */
+
+uint8_t vl53l8cx_get_caldata_xtalk(
+  VL53L8CX_Configuration    *p_dev,
+  uint8_t       *p_xtalk_data);
+
+/**
+ * @brief This function sets the Xtalk buffer. This function can be used to
+ * override default Xtalk buffer.
+ * @param (VL53L8CX_Configuration) *p_dev : VL53L5 configuration structure.
+ * @param (uint8_t) *p_xtalk_data : Buffer with a size defined by
+ * macro VL53L8CX_XTALK_SIZE.
+ * @return (uint8_t) status : 0 if buffer OK
+ */
+
+uint8_t vl53l8cx_set_caldata_xtalk(
+  VL53L8CX_Configuration    *p_dev,
+  uint8_t       *p_xtalk_data);
+
+/**
+ * @brief This function gets the Xtalk margin. This margin is used to increase
+ * the Xtalk threshold. It can also be used to avoid false positives after the
+ * Xtalk calibration. The default value is 50 kcps/spads.
+ * @param (VL53L8CX_Configuration) *p_dev : VL53L8CX configuration structure.
+ * @param (uint32_t) *p_xtalk_margin : Xtalk margin in kcps/spads.
+ * @return (uint8_t) status : 0 if reading OK
+ */
+
+uint8_t vl53l8cx_get_xtalk_margin(
+  VL53L8CX_Configuration    *p_dev,
+  uint32_t      *p_xtalk_margin);
+
+/**
+ * @brief This function sets the Xtalk margin. This margin is used to increase
+ * the Xtalk threshold. It can also be used to avoid false positives after the
+ * Xtalk calibration. The default value is 50 kcps/spads.
+ * @param (VL53L8CX_Configuration) *p_dev : VL53L8CX configuration structure.
+ * @param (uint32_t) xtalk_margin : New Xtalk margin in kcps/spads. Min value is
+ * 0 kcps/spads, and max is 10.000 kcps/spads
+ * @return (uint8_t) status : 0 if set margin is OK, or 127 is the margin is
+ * invalid.
+ */
+
+uint8_t vl53l8cx_set_xtalk_margin(
+  VL53L8CX_Configuration    *p_dev,
+  uint32_t      xtalk_margin);
 
 /**
  * @brief Command used to get Xtalk calibration data
@@ -334,5 +392,9 @@ static const uint8_t VL53L8CX_CALIBRATE_XTALK[] = {
   0x00, 0x00, 0x00, 0x0F,
   0x00, 0x01, 0x03, 0xD4
 };
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif /* VL53L8CX_PLUGIN_XTALK_H_ */

@@ -1,10 +1,10 @@
 /**
  ******************************************************************************
- * @file    platform.h
+ * @file    platform.cpp
  * @author  STMicroelectronics
  * @version V1.0.0
  * @date    11 November 2021
- * @brief   Header file of the platform dependent structures.
+ * @brief   Implementation of the platform dependent APIs.
  ******************************************************************************
  * @attention
  *
@@ -35,84 +35,65 @@
  ******************************************************************************
  */
 
-#ifndef _PLATFORM_H_
-#define _PLATFORM_H_
 
-#ifdef __cplusplus
-extern "C" {
-#endif
-
-
-#pragma once
-
-#include <stdint.h>
-#include <string.h>
-#include "platform_config.h"
-
-#define VL53L8CX_COMMS_CHUNK_SIZE 4096
-#define SPI_WRITE_MASK(x) (uint16_t)(x | 0x8000)
-#define SPI_READ_MASK(x)  (uint16_t)(x & ~0x8000)
-#ifndef DEFAULT_I2C_BUFFER_LEN
-
-
-
-
-typedef uint8_t (*VL53L8CX_wait_Func)(void *, uint32_t);
-typedef uint8_t (*VL53L8CX_write_Func)(void *, uint16_t, uint8_t *, uint32_t);
-typedef uint8_t (*VL53L8CX_read_Func)(void *, uint16_t, uint8_t *, uint32_t);
-
-
-#ifdef ARDUINO_SAM_DUE
-/* FIXME: It seems that an I2C buffer of BUFFER_LENGTH does not work on Arduino DUE. So, we need to decrease the size */
-#define DEFAULT_I2C_BUFFER_LEN (BUFFER_LENGTH - 2)
-#else
-#ifdef BUFFER_LENGTH
-#define DEFAULT_I2C_BUFFER_LEN BUFFER_LENGTH
-#else
-#define DEFAULT_I2C_BUFFER_LEN 32
-#endif
-#endif
-#endif
-typedef struct {
-  uint16_t  address;
-  VL53L8CX_write_Func Write;
-  VL53L8CX_read_Func Read;
-  VL53L8CX_wait_Func Wait;
-  void *handle;
-} VL53L8CX_Platform;
+#include "platform.h"
 
 
 uint8_t VL53L8CX_RdByte(
   VL53L8CX_Platform *p_platform,
-  uint16_t RegisterAddress,
-  uint8_t *p_value);
+  uint16_t RegisterAdress,
+  uint8_t *p_value)
+{
+  return p_platform->Read(p_platform->handle, RegisterAdress, p_value, 1U);
+}
 
 uint8_t VL53L8CX_WrByte(
   VL53L8CX_Platform *p_platform,
-  uint16_t RegisterAddress,
-  uint8_t value);
+  uint16_t RegisterAdress,
+  uint8_t value)
+{
+  return p_platform->Write(p_platform->handle, RegisterAdress, &value, 1U);
+}
 
 uint8_t VL53L8CX_WrMulti(
   VL53L8CX_Platform *p_platform,
-  uint16_t RegisterAddress,
+  uint16_t RegisterAdress,
   uint8_t *p_values,
-  uint32_t size);
+  uint32_t size)
+{
+  return p_platform->Write(p_platform->handle, RegisterAdress, p_values, size);
+}
 
 uint8_t VL53L8CX_RdMulti(
   VL53L8CX_Platform *p_platform,
-  uint16_t RegisterAddress,
+  uint16_t RegisterAdress,
   uint8_t *p_values,
-  uint32_t size);
+  uint32_t size)
+{
+  return p_platform->Read(p_platform->handle, RegisterAdress, p_values, size);
+}
+
+void VL53L8CX_SwapBuffer(
+  uint8_t     *buffer,
+  uint16_t     size)
+{
+  uint32_t i, tmp;
+
+  /* Example of possible implementation using <string.h> */
+  for (i = 0; i < size; i = i + 4) {
+    tmp = (
+            buffer[i] << 24)
+          | (buffer[i + 1] << 16)
+          | (buffer[i + 2] << 8)
+          | (buffer[i + 3]);
+
+    memcpy(&(buffer[i]), &tmp, 4);
+  }
+}
 
 uint8_t VL53L8CX_WaitMs(
   VL53L8CX_Platform *p_platform,
-  uint32_t TimeMs);
-void VL53L8CX_SwapBuffer(
-  uint8_t     *buffer,
-  uint16_t     size);
-
-#ifdef __cplusplus
+  uint32_t TimeMs)
+{
+  return p_platform->Wait(p_platform->handle, TimeMs);
 }
-#endif
-
-#endif  // _PLATFORM_H_
