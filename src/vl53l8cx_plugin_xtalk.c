@@ -1,48 +1,24 @@
 /**
- ******************************************************************************
- * @file    vl53l8cx_plugin_xtalk.cpp
- * @author  STMicroelectronics
- * @version V1.0.0
- * @date    13 January 2023
- * @brief   Implementation of the VL53L8CX APIs for xtalk calibration.
- ******************************************************************************
- * @attention
- *
- * <h2><center>&copy; COPYRIGHT(c) 2021 STMicroelectronics</center></h2>
- *
- * Redistribution and use in source and binary forms, with or without modification,
- * are permitted provided that the following conditions are met:
- *   1. Redistributions of source code must retain the above copyright notice,
- *      this list of conditions and the following disclaimer.
- *   2. Redistributions in binary form must reproduce the above copyright notice,
- *      this list of conditions and the following disclaimer in the documentation
- *      and/or other materials provided with the distribution.
- *   3. Neither the name of STMicroelectronics nor the names of its contributors
- *      may be used to endorse or promote products derived from this software
- *      without specific prior written permission.
- *
- * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
- * AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
- * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
- * DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
- * FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
- * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
- * SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
- * CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
- * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
- * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
- *
- ******************************************************************************
- */
+  *
+  * Copyright (c) 2021 STMicroelectronics.
+  * All rights reserved.
+  *
+  * This software is licensed under terms that can be found in the LICENSE file
+  * in the root directory of this software component.
+  * If no LICENSE file comes with this software, it is provided AS-IS.
+  *
+  ******************************************************************************
+  */
 
-#include "vl53l8cx_class.h"
+#include "vl53l8cx_plugin_xtalk.h"
 
 /*
  * Inner function, not available outside this file. This function is used to
  * wait for an answer from VL53L5 sensor.
  */
 
-uint8_t VL53L8CX::_vl53l8cx_poll_for_answer_xtalk(
+static uint8_t _vl53l8cx_poll_for_answer(
+  VL53L8CX_Configuration   *p_dev,
   uint16_t        address,
   uint8_t         expected_value)
 {
@@ -50,9 +26,9 @@ uint8_t VL53L8CX::_vl53l8cx_poll_for_answer_xtalk(
   uint8_t timeout = 0;
 
   do {
-    status |= RdMulti(&(p_dev->platform),
-                      address, p_dev->temp_buffer, 4);
-    status |= WaitMs(&(p_dev->platform), 10);
+    status |= VL53L8CX_RdMulti(&(p_dev->platform),
+                               address, p_dev->temp_buffer, 4);
+    status |= VL53L8CX_WaitMs(&(p_dev->platform), 10);
 
     /* 2s timeout or FW error*/
     if ((timeout >= (uint8_t)200)
@@ -72,14 +48,15 @@ uint8_t VL53L8CX::_vl53l8cx_poll_for_answer_xtalk(
  * program the output using the macro defined into the 'platform.h' file.
  */
 
-uint8_t VL53L8CX::_vl53l8cx_program_output_config()
+static uint8_t _vl53l8cx_program_output_config(
+  VL53L8CX_Configuration     *p_dev)
 {
   uint8_t resolution, status = VL53L8CX_STATUS_OK;
   uint32_t i;
-  union Block_header *bh_ptr;
   uint32_t header_config[2] = {0, 0};
+  union Block_header *bh_ptr;
 
-  status |= vl53l8cx_get_resolution(&resolution);
+  status |= vl53l8cx_get_resolution(p_dev, &resolution);
   p_dev->data_read_size = 0;
 
   /* Enable mandatory output (meta and common data) */
@@ -135,29 +112,30 @@ uint8_t VL53L8CX::_vl53l8cx_program_output_config()
     } else {
       p_dev->data_read_size += bh_ptr->size;
     }
+
     p_dev->data_read_size += (uint32_t)4;
   }
   p_dev->data_read_size += (uint32_t)24;
 
-  status |= vl53l8cx_dci_write_data(
-              (uint8_t *) & (output),
-              VL53L8CX_DCI_OUTPUT_LIST, (uint16_t)sizeof(output));
+  status |= vl53l8cx_dci_write_data(p_dev,
+                                    (uint8_t *) & (output),
+                                    VL53L8CX_DCI_OUTPUT_LIST, (uint16_t)sizeof(output));
 
   header_config[0] = p_dev->data_read_size;
   header_config[1] = i + (uint32_t)1;
 
-  status |= vl53l8cx_dci_write_data(
-              (uint8_t *) & (header_config), VL53L8CX_DCI_OUTPUT_CONFIG,
-              (uint16_t)sizeof(header_config));
-
-  status |= vl53l8cx_dci_write_data((uint8_t *) & (output_bh_enable),
+  status |= vl53l8cx_dci_write_data(p_dev, (uint8_t *) & (header_config),
+                                    VL53L8CX_DCI_OUTPUT_CONFIG,
+                                    (uint16_t)sizeof(header_config));
+  status |= vl53l8cx_dci_write_data(p_dev, (uint8_t *) & (output_bh_enable),
                                     VL53L8CX_DCI_OUTPUT_ENABLES,
                                     (uint16_t)sizeof(output_bh_enable));
 
   return status;
 }
 
-uint8_t VL53L8CX::vl53l8cx_calibrate_xtalk(
+uint8_t vl53l8cx_calibrate_xtalk(
+  VL53L8CX_Configuration    *p_dev,
   uint16_t      reflectance_percent,
   uint8_t       nb_samples,
   uint16_t      distance_mm)
@@ -176,13 +154,13 @@ uint8_t VL53L8CX::vl53l8cx_calibrate_xtalk(
   uint8_t *default_xtalk_ptr;
 
   /* Get initial configuration */
-  status |= vl53l8cx_get_resolution(&resolution);
-  status |= vl53l8cx_get_ranging_frequency_hz(&frequency);
-  status |= vl53l8cx_get_integration_time_ms(&integration_time_ms);
-  status |= vl53l8cx_get_sharpener_percent(&sharp_prct);
-  status |= vl53l8cx_get_target_order(&target_order);
-  status |= vl53l8cx_get_xtalk_margin(&xtalk_margin);
-  status |= vl53l8cx_get_ranging_mode(&ranging_mode);
+  status |= vl53l8cx_get_resolution(p_dev, &resolution);
+  status |= vl53l8cx_get_ranging_frequency_hz(p_dev, &frequency);
+  status |= vl53l8cx_get_integration_time_ms(p_dev, &integration_time_ms);
+  status |= vl53l8cx_get_sharpener_percent(p_dev, &sharp_prct);
+  status |= vl53l8cx_get_target_order(p_dev, &target_order);
+  status |= vl53l8cx_get_xtalk_margin(p_dev, &xtalk_margin);
+  status |= vl53l8cx_get_ranging_mode(p_dev, &ranging_mode);
 
   /* Check input arguments validity */
   if (((reflectance < (uint16_t)1) || (reflectance > (uint16_t)99))
@@ -190,50 +168,49 @@ uint8_t VL53L8CX::vl53l8cx_calibrate_xtalk(
       || ((samples < (uint8_t)1) || (samples > (uint8_t)16))) {
     status |= VL53L8CX_STATUS_INVALID_PARAM;
   } else {
-    status |= vl53l8cx_set_resolution(
-                VL53L8CX_RESOLUTION_8X8);
+    status |= vl53l8cx_set_resolution(p_dev,
+                                      VL53L8CX_RESOLUTION_8X8);
 
     /* Send Xtalk calibration buffer */
     (void)memcpy(p_dev->temp_buffer, VL53L8CX_CALIBRATE_XTALK,
                  sizeof(VL53L8CX_CALIBRATE_XTALK));
-    status |= WrMulti(&(p_dev->platform), 0x2c28,
-                      p_dev->temp_buffer,
-                      (uint16_t)sizeof(VL53L8CX_CALIBRATE_XTALK));
-    status |= _vl53l8cx_poll_for_answer_xtalk(
-                VL53L8CX_UI_CMD_STATUS, 0x3);
+    status |= VL53L8CX_WrMulti(&(p_dev->platform), 0x2c28,
+                               p_dev->temp_buffer,
+                               (uint16_t)sizeof(VL53L8CX_CALIBRATE_XTALK));
+    status |= _vl53l8cx_poll_for_answer(p_dev,
+                                        VL53L8CX_UI_CMD_STATUS, 0x3);
 
     /* Format input argument */
     reflectance = reflectance * (uint16_t)16;
     distance = distance * (uint16_t)4;
 
     /* Update required fields */
-    status |= vl53l8cx_dci_replace_data(p_dev->temp_buffer,
+    status |= vl53l8cx_dci_replace_data(p_dev, p_dev->temp_buffer,
                                         VL53L8CX_DCI_CAL_CFG, 8,
                                         (uint8_t *)&distance, 2, 0x00);
 
-    status |= vl53l8cx_dci_replace_data(p_dev->temp_buffer,
+    status |= vl53l8cx_dci_replace_data(p_dev, p_dev->temp_buffer,
                                         VL53L8CX_DCI_CAL_CFG, 8,
                                         (uint8_t *)&reflectance, 2, 0x02);
 
-    status |= vl53l8cx_dci_replace_data(p_dev->temp_buffer,
+    status |= vl53l8cx_dci_replace_data(p_dev, p_dev->temp_buffer,
                                         VL53L8CX_DCI_CAL_CFG, 8,
                                         (uint8_t *)&samples, 1, 0x04);
 
     /* Program output for Xtalk calibration */
-    status |= _vl53l8cx_program_output_config();
+    status |= _vl53l8cx_program_output_config(p_dev);
 
     /* Start ranging session */
-    status |= WrMulti(&(p_dev->platform),
-                      VL53L8CX_UI_CMD_END - (uint16_t)(4 - 1),
-                      (uint8_t *)cmd, sizeof(cmd));
-    status |= _vl53l8cx_poll_for_answer_xtalk(
-                VL53L8CX_UI_CMD_STATUS, 0x3);
+    status |= VL53L8CX_WrMulti(&(p_dev->platform),
+                               VL53L8CX_UI_CMD_END - (uint16_t)(4 - 1),
+                               (uint8_t *)cmd, sizeof(cmd));
+    status |= _vl53l8cx_poll_for_answer(p_dev,
+                                        VL53L8CX_UI_CMD_STATUS, 0x3);
 
     /* Wait for end of calibration */
     do {
-      status |= RdMulti(&(p_dev->platform),
-                        0x0, p_dev->temp_buffer, 4);
-
+      status |= VL53L8CX_RdMulti(&(p_dev->platform),
+                                 0x0, p_dev->temp_buffer, 4);
       if (p_dev->temp_buffer[0] != VL53L8CX_STATUS_ERROR) {
         /* Coverglass too good for Xtalk calibration */
         if ((p_dev->temp_buffer[2] >= (uint8_t)0x7f) &&
@@ -243,6 +220,7 @@ uint8_t VL53L8CX::vl53l8cx_calibrate_xtalk(
           (void)memcpy(p_dev->xtalk_data,
                        default_xtalk_ptr,
                        sizeof(p_dev->xtalk_data));
+          status |= VL53L8CX_STATUS_XTALK_FAILED;
         }
         continue_loop = (uint8_t)0;
       } else if (timeout >= (uint16_t)400) {
@@ -250,7 +228,7 @@ uint8_t VL53L8CX::vl53l8cx_calibrate_xtalk(
         continue_loop = (uint8_t)0;
       } else {
         timeout++;
-        status |= WaitMs(&(p_dev->platform), 50);
+        status |= VL53L8CX_WaitMs(&(p_dev->platform), 50);
       }
 
     } while (continue_loop == (uint8_t)1);
@@ -259,13 +237,13 @@ uint8_t VL53L8CX::vl53l8cx_calibrate_xtalk(
   /* Save Xtalk data into the Xtalk buffer */
   (void)memcpy(p_dev->temp_buffer, VL53L8CX_GET_XTALK_CMD,
                sizeof(VL53L8CX_GET_XTALK_CMD));
-  status |= WrMulti(&(p_dev->platform), 0x2fb8,
-                    p_dev->temp_buffer,
-                    (uint16_t)sizeof(VL53L8CX_GET_XTALK_CMD));
-  status |= _vl53l8cx_poll_for_answer_xtalk(VL53L8CX_UI_CMD_STATUS, 0x03);
-  status |= RdMulti(&(p_dev->platform), VL53L8CX_UI_CMD_START,
-                    p_dev->temp_buffer,
-                    VL53L8CX_XTALK_BUFFER_SIZE + (uint16_t)4);
+  status |= VL53L8CX_WrMulti(&(p_dev->platform), 0x2fb8,
+                             p_dev->temp_buffer,
+                             (uint16_t)sizeof(VL53L8CX_GET_XTALK_CMD));
+  status |= _vl53l8cx_poll_for_answer(p_dev, VL53L8CX_UI_CMD_STATUS, 0x03);
+  status |= VL53L8CX_RdMulti(&(p_dev->platform), VL53L8CX_UI_CMD_START,
+                             p_dev->temp_buffer,
+                             VL53L8CX_XTALK_BUFFER_SIZE + (uint16_t)4);
 
   (void)memcpy(&(p_dev->xtalk_data[0]), &(p_dev->temp_buffer[8]),
                VL53L8CX_XTALK_BUFFER_SIZE - (uint16_t)8);
@@ -273,66 +251,72 @@ uint8_t VL53L8CX::vl53l8cx_calibrate_xtalk(
                                    - (uint16_t)8]), footer, sizeof(footer));
 
   /* Reset default buffer */
-  status |= WrMulti(&(p_dev->platform), 0x2c34,
-                    p_dev->default_configuration,
-                    VL53L8CX_CONFIGURATION_SIZE);
-  status |= _vl53l8cx_poll_for_answer_xtalk(VL53L8CX_UI_CMD_STATUS, 0x03);
+  status |= VL53L8CX_WrMulti(&(p_dev->platform), 0x2c34,
+                             p_dev->default_configuration,
+                             VL53L8CX_CONFIGURATION_SIZE);
+  status |= _vl53l8cx_poll_for_answer(p_dev, VL53L8CX_UI_CMD_STATUS, 0x03);
 
   /* Reset initial configuration */
-  status |= vl53l8cx_set_resolution(resolution);
-  status |= vl53l8cx_set_ranging_frequency_hz(frequency);
-  status |= vl53l8cx_set_integration_time_ms(integration_time_ms);
-  status |= vl53l8cx_set_sharpener_percent(sharp_prct);
-  status |= vl53l8cx_set_target_order(target_order);
-  status |= vl53l8cx_set_xtalk_margin(xtalk_margin);
-  status |= vl53l8cx_set_ranging_mode(ranging_mode);
+  status |= vl53l8cx_set_resolution(p_dev, resolution);
+  status |= vl53l8cx_set_ranging_frequency_hz(p_dev, frequency);
+  status |= vl53l8cx_set_integration_time_ms(p_dev, integration_time_ms);
+  status |= vl53l8cx_set_sharpener_percent(p_dev, sharp_prct);
+  status |= vl53l8cx_set_target_order(p_dev, target_order);
+  status |= vl53l8cx_set_xtalk_margin(p_dev, xtalk_margin);
+  status |= vl53l8cx_set_ranging_mode(p_dev, ranging_mode);
 
   return status;
 }
 
-uint8_t VL53L8CX::vl53l8cx_get_caldata_xtalk(uint8_t *p_xtalk_data)
+uint8_t vl53l8cx_get_caldata_xtalk(
+  VL53L8CX_Configuration    *p_dev,
+  uint8_t       *p_xtalk_data)
 {
   uint8_t status = VL53L8CX_STATUS_OK, resolution;
   uint8_t footer[] = {0x00, 0x00, 0x00, 0x0F, 0x00, 0x01, 0x03, 0x04};
 
-  status |= vl53l8cx_get_resolution(&resolution);
-  status |= vl53l8cx_set_resolution(VL53L8CX_RESOLUTION_8X8);
+  status |= vl53l8cx_get_resolution(p_dev, &resolution);
+  status |= vl53l8cx_set_resolution(p_dev, VL53L8CX_RESOLUTION_8X8);
 
   (void)memcpy(p_dev->temp_buffer, VL53L8CX_GET_XTALK_CMD,
                sizeof(VL53L8CX_GET_XTALK_CMD));
-  status |= WrMulti(&(p_dev->platform), 0x2fb8,
-                    p_dev->temp_buffer,  sizeof(VL53L8CX_GET_XTALK_CMD));
-  status |= _vl53l8cx_poll_for_answer_xtalk(VL53L8CX_UI_CMD_STATUS, 0x03);
-  status |= RdMulti(&(p_dev->platform), VL53L8CX_UI_CMD_START,
-                    p_dev->temp_buffer,
-                    VL53L8CX_XTALK_BUFFER_SIZE + (uint16_t)4);
+  status |= VL53L8CX_WrMulti(&(p_dev->platform), 0x2fb8,
+                             p_dev->temp_buffer,  sizeof(VL53L8CX_GET_XTALK_CMD));
+  status |= _vl53l8cx_poll_for_answer(p_dev, VL53L8CX_UI_CMD_STATUS, 0x03);
+  status |= VL53L8CX_RdMulti(&(p_dev->platform), VL53L8CX_UI_CMD_START,
+                             p_dev->temp_buffer,
+                             VL53L8CX_XTALK_BUFFER_SIZE + (uint16_t)4);
 
   (void)memcpy(&(p_xtalk_data[0]), &(p_dev->temp_buffer[8]),
                VL53L8CX_XTALK_BUFFER_SIZE - (uint16_t)8);
   (void)memcpy(&(p_xtalk_data[VL53L8CX_XTALK_BUFFER_SIZE - (uint16_t)8]),
                footer, sizeof(footer));
 
-  status |= vl53l8cx_set_resolution(resolution);
+  status |= vl53l8cx_set_resolution(p_dev, resolution);
 
   return status;
 }
 
-uint8_t VL53L8CX::vl53l8cx_set_caldata_xtalk(uint8_t *p_xtalk_data)
+uint8_t vl53l8cx_set_caldata_xtalk(
+  VL53L8CX_Configuration    *p_dev,
+  uint8_t       *p_xtalk_data)
 {
   uint8_t resolution, status = VL53L8CX_STATUS_OK;
 
-  status |= vl53l8cx_get_resolution(&resolution);
+  status |= vl53l8cx_get_resolution(p_dev, &resolution);
   (void)memcpy(p_dev->xtalk_data, p_xtalk_data, VL53L8CX_XTALK_BUFFER_SIZE);
-  status |= vl53l8cx_set_resolution(resolution);
+  status |= vl53l8cx_set_resolution(p_dev, resolution);
 
   return status;
 }
 
-uint8_t VL53L8CX::vl53l8cx_get_xtalk_margin(uint32_t *p_xtalk_margin)
+uint8_t vl53l8cx_get_xtalk_margin(
+  VL53L8CX_Configuration    *p_dev,
+  uint32_t      *p_xtalk_margin)
 {
   uint8_t status = VL53L8CX_STATUS_OK;
 
-  status |= vl53l8cx_dci_read_data((uint8_t *)p_dev->temp_buffer,
+  status |= vl53l8cx_dci_read_data(p_dev, (uint8_t *)p_dev->temp_buffer,
                                    VL53L8CX_DCI_XTALK_CFG, 16);
 
   (void)memcpy(p_xtalk_margin, p_dev->temp_buffer, 4);
@@ -341,7 +325,9 @@ uint8_t VL53L8CX::vl53l8cx_get_xtalk_margin(uint32_t *p_xtalk_margin)
   return status;
 }
 
-uint8_t VL53L8CX::vl53l8cx_set_xtalk_margin(uint32_t xtalk_margin)
+uint8_t vl53l8cx_set_xtalk_margin(
+  VL53L8CX_Configuration    *p_dev,
+  uint32_t      xtalk_margin)
 {
   uint8_t status = VL53L8CX_STATUS_OK;
   uint32_t margin_kcps = xtalk_margin;
@@ -350,7 +336,7 @@ uint8_t VL53L8CX::vl53l8cx_set_xtalk_margin(uint32_t xtalk_margin)
     status |= VL53L8CX_STATUS_INVALID_PARAM;
   } else {
     margin_kcps = margin_kcps * (uint32_t)2048;
-    status |= vl53l8cx_dci_replace_data(p_dev->temp_buffer,
+    status |= vl53l8cx_dci_replace_data(p_dev, p_dev->temp_buffer,
                                         VL53L8CX_DCI_XTALK_CFG, 16,
                                         (uint8_t *)&margin_kcps, 4, 0x00);
   }

@@ -1,52 +1,27 @@
 /**
- ******************************************************************************
- * @file    vl53l8cx_api.cpp
- * @author  STMicroelectronics
- * @version V1.0.0
- * @date    13 January 2023
- * @brief   Implementation of the VL53L8CX APIs.
- ******************************************************************************
- * @attention
- *
- * <h2><center>&copy; COPYRIGHT(c) 2021 STMicroelectronics</center></h2>
- *
- * Redistribution and use in source and binary forms, with or without modification,
- * are permitted provided that the following conditions are met:
- *   1. Redistributions of source code must retain the above copyright notice,
- *      this list of conditions and the following disclaimer.
- *   2. Redistributions in binary form must reproduce the above copyright notice,
- *      this list of conditions and the following disclaimer in the documentation
- *      and/or other materials provided with the distribution.
- *   3. Neither the name of STMicroelectronics nor the names of its contributors
- *      may be used to endorse or promote products derived from this software
- *      without specific prior written permission.
- *
- * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
- * AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
- * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
- * DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
- * FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
- * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
- * SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
- * CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
- * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
- * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
- *
- ******************************************************************************
- */
+  *
+  * Copyright (c) 2021 STMicroelectronics.
+  * All rights reserved.
+  *
+  * This software is licensed under terms that can be found in the LICENSE file
+  * in the root directory of this software component.
+  * If no LICENSE file comes with this software, it is provided AS-IS.
+  *
+  ******************************************************************************
+  */
 
 #include <stdlib.h>
 #include <string.h>
-#include "vl53l8cx_class.h"
+#include "vl53l8cx_api.h"
 #include "vl53l8cx_buffers.h"
-
 
 /**
  * @brief Inner function, not available outside this file. This function is used
  * to wait for an answer from VL53L8CX sensor.
  */
 
-uint8_t VL53L8CX::_vl53l8cx_poll_for_answer(
+static uint8_t _vl53l8cx_poll_for_answer(
+  VL53L8CX_Configuration  *p_dev,
   uint8_t         size,
   uint8_t         pos,
   uint16_t        address,
@@ -57,9 +32,9 @@ uint8_t VL53L8CX::_vl53l8cx_poll_for_answer(
   uint8_t timeout = 0;
 
   do {
-    status |= RdMulti(&(p_dev->platform), address,
-                      p_dev->temp_buffer, size);
-    status |= WaitMs(&(p_dev->platform), 10);
+    status |= VL53L8CX_RdMulti(&(p_dev->platform), address,
+                               p_dev->temp_buffer, size);
+    status |= VL53L8CX_WaitMs(&(p_dev->platform), 10);
 
     if (timeout >= (uint8_t)200) { /* 2s timeout */
       status |= (uint8_t)VL53L8CX_STATUS_TIMEOUT_ERROR;
@@ -80,27 +55,27 @@ uint8_t VL53L8CX::_vl53l8cx_poll_for_answer(
  * Inner function, not available outside this file. This function is used to
  * wait for the MCU to boot.
  */
-uint8_t VL53L8CX::_vl53l8cx_poll_for_mcu_boot()
+static uint8_t _vl53l8cx_poll_for_mcu_boot(
+  VL53L8CX_Configuration      *p_dev)
 {
   uint8_t go2_status0, go2_status1, status = VL53L8CX_STATUS_OK;
   uint16_t timeout = 0;
 
   do {
-    status |= RdByte(&(p_dev->platform), 0x06, &go2_status0);
+    status |= VL53L8CX_RdByte(&(p_dev->platform), 0x06, &go2_status0);
     if ((go2_status0 & (uint8_t)0x80) != (uint8_t)0) {
-      status |= RdByte(&(p_dev->platform), 0x07, &go2_status1);
+      status |= VL53L8CX_RdByte(&(p_dev->platform), 0x07, &go2_status1);
       if (go2_status1 & (uint8_t)0x01) {
         status |= VL53L8CX_STATUS_OK;
         break;
       }
     }
-    (void)WaitMs(&(p_dev->platform), 1);
+    (void)VL53L8CX_WaitMs(&(p_dev->platform), 1);
     timeout++;
 
     if ((go2_status0 & (uint8_t)0x1) != (uint8_t)0) {
       break;
     }
-
   } while (timeout < (uint16_t)500);
 
   return status;
@@ -111,7 +86,9 @@ uint8_t VL53L8CX::_vl53l8cx_poll_for_mcu_boot()
  * to set the offset data gathered from NVM.
  */
 
-uint8_t VL53L8CX::_vl53l8cx_send_offset_data(uint8_t resolution)
+static uint8_t _vl53l8cx_send_offset_data(
+  VL53L8CX_Configuration    *p_dev,
+  uint8_t           resolution)
 {
   uint8_t status = VL53L8CX_STATUS_OK;
   uint32_t signal_grid[64];
@@ -127,7 +104,7 @@ uint8_t VL53L8CX::_vl53l8cx_send_offset_data(uint8_t resolution)
   /* Data extrapolation is required for 4X4 offset */
   if (resolution == (uint8_t)VL53L8CX_RESOLUTION_4X4) {
     (void)memcpy(&(p_dev->temp_buffer[0x10]), dss_4x4, sizeof(dss_4x4));
-    SwapBuffer(p_dev->temp_buffer, VL53L8CX_OFFSET_BUFFER_SIZE);
+    VL53L8CX_SwapBuffer(p_dev->temp_buffer, VL53L8CX_OFFSET_BUFFER_SIZE);
     (void)memcpy(signal_grid, &(p_dev->temp_buffer[0x3C]),
                  sizeof(signal_grid));
     (void)memcpy(range_grid, &(p_dev->temp_buffer[0x140]),
@@ -155,7 +132,7 @@ uint8_t VL53L8CX::_vl53l8cx_send_offset_data(uint8_t resolution)
                  signal_grid, sizeof(signal_grid));
     (void)memcpy(&(p_dev->temp_buffer[0x140]),
                  range_grid, sizeof(range_grid));
-    SwapBuffer(p_dev->temp_buffer, VL53L8CX_OFFSET_BUFFER_SIZE);
+    VL53L8CX_SwapBuffer(p_dev->temp_buffer, VL53L8CX_OFFSET_BUFFER_SIZE);
   }
 
   for (k = 0; k < (VL53L8CX_OFFSET_BUFFER_SIZE - (uint16_t)4); k++) {
@@ -163,9 +140,9 @@ uint8_t VL53L8CX::_vl53l8cx_send_offset_data(uint8_t resolution)
   }
 
   (void)memcpy(&(p_dev->temp_buffer[0x1E0]), footer, 8);
-  status |= WrMulti(&(p_dev->platform), 0x2e18, p_dev->temp_buffer,
-                    VL53L8CX_OFFSET_BUFFER_SIZE);
-  status |= _vl53l8cx_poll_for_answer(4, 1,
+  status |= VL53L8CX_WrMulti(&(p_dev->platform), 0x2e18, p_dev->temp_buffer,
+                             VL53L8CX_OFFSET_BUFFER_SIZE);
+  status |= _vl53l8cx_poll_for_answer(p_dev, 4, 1,
                                       VL53L8CX_UI_CMD_STATUS, 0xff, 0x03);
 
   return status;
@@ -176,7 +153,9 @@ uint8_t VL53L8CX::_vl53l8cx_send_offset_data(uint8_t resolution)
  * to set the Xtalk data from generic configuration, or user's calibration.
  */
 
-uint8_t VL53L8CX::_vl53l8cx_send_xtalk_data(uint8_t resolution)
+static uint8_t _vl53l8cx_send_xtalk_data(
+  VL53L8CX_Configuration    *p_dev,
+  uint8_t       resolution)
 {
   uint8_t status = VL53L8CX_STATUS_OK;
   uint8_t res4x4[] = {0x0F, 0x04, 0x04, 0x17, 0x08, 0x10, 0x10, 0x07};
@@ -195,7 +174,7 @@ uint8_t VL53L8CX::_vl53l8cx_send_xtalk_data(uint8_t resolution)
     (void)memcpy(&(p_dev->temp_buffer[0x020]),
                  dss_4x4, sizeof(dss_4x4));
 
-    SwapBuffer(p_dev->temp_buffer, VL53L8CX_XTALK_BUFFER_SIZE);
+    VL53L8CX_SwapBuffer(p_dev->temp_buffer, VL53L8CX_XTALK_BUFFER_SIZE);
     (void)memcpy(signal_grid, &(p_dev->temp_buffer[0x34]),
                  sizeof(signal_grid));
 
@@ -211,189 +190,203 @@ uint8_t VL53L8CX::_vl53l8cx_send_xtalk_data(uint8_t resolution)
     (void)memset(&signal_grid[0x10], 0, (uint32_t)192);
     (void)memcpy(&(p_dev->temp_buffer[0x34]),
                  signal_grid, sizeof(signal_grid));
-    SwapBuffer(p_dev->temp_buffer, VL53L8CX_XTALK_BUFFER_SIZE);
+    VL53L8CX_SwapBuffer(p_dev->temp_buffer, VL53L8CX_XTALK_BUFFER_SIZE);
     (void)memcpy(&(p_dev->temp_buffer[0x134]),
                  profile_4x4, sizeof(profile_4x4));
     (void)memset(&(p_dev->temp_buffer[0x078]), 0,
                  (uint32_t)4 * sizeof(uint8_t));
   }
 
-  status |= WrMulti(&(p_dev->platform), 0x2cf8,
-                    p_dev->temp_buffer, VL53L8CX_XTALK_BUFFER_SIZE);
-  status |= _vl53l8cx_poll_for_answer(4, 1,
+  status |= VL53L8CX_WrMulti(&(p_dev->platform), 0x2cf8,
+                             p_dev->temp_buffer, VL53L8CX_XTALK_BUFFER_SIZE);
+  status |= _vl53l8cx_poll_for_answer(p_dev, 4, 1,
                                       VL53L8CX_UI_CMD_STATUS, 0xff, 0x03);
 
   return status;
 }
 
-uint8_t VL53L8CX::vl53l8cx_is_alive(uint8_t *p_is_alive)
+uint8_t vl53l8cx_is_alive(
+  VL53L8CX_Configuration    *p_dev,
+  uint8_t       *p_is_alive)
 {
   uint8_t status = VL53L8CX_STATUS_OK;
   uint8_t device_id, revision_id;
-  status |= WrByte(&(p_dev->platform), 0x7fff, 0x00);
-  status |= RdByte(&(p_dev->platform), 0, &device_id);
-  status |= RdByte(&(p_dev->platform), 1, &revision_id);
-  status |= WrByte(&(p_dev->platform), 0x7fff, 0x02);
+
+  status |= VL53L8CX_WrByte(&(p_dev->platform), 0x7fff, 0x00);
+  status |= VL53L8CX_RdByte(&(p_dev->platform), 0, &device_id);
+  status |= VL53L8CX_RdByte(&(p_dev->platform), 1, &revision_id);
+  status |= VL53L8CX_WrByte(&(p_dev->platform), 0x7fff, 0x02);
+
+
   if ((device_id == (uint8_t)0xF0) && (revision_id == (uint8_t)0x0C)) {
     *p_is_alive = 1;
   } else {
     *p_is_alive = 0;
   }
 
+
   return status;
 }
 
-uint8_t VL53L8CX::vl53l8cx_init()
+uint8_t vl53l8cx_init(
+  VL53L8CX_Configuration    *p_dev)
 {
   uint8_t tmp, status = VL53L8CX_STATUS_OK;
   uint8_t pipe_ctrl[] = {VL53L8CX_NB_TARGET_PER_ZONE, 0x00, 0x01, 0x00};
   uint32_t single_range = 0x01;
-
+  uint32_t crc_checksum = 0x00;
   p_dev->default_xtalk = (uint8_t *)VL53L8CX_DEFAULT_XTALK;
   p_dev->default_configuration = (uint8_t *)VL53L8CX_DEFAULT_CONFIGURATION;
   p_dev->is_auto_stop_enabled = (uint8_t)0x0;
 
   /* SW reboot sequence */
-  status |= WrByte(&(p_dev->platform), 0x7fff, 0x00);
-  status |= WrByte(&(p_dev->platform), 0x0009, 0x04);
-  status |= WrByte(&(p_dev->platform), 0x000F, 0x40);
-  status |= WrByte(&(p_dev->platform), 0x000A, 0x03);
-  status |= RdByte(&(p_dev->platform), 0x7FFF, &tmp);
-  status |= WrByte(&(p_dev->platform), 0x000C, 0x01);
+  status |= VL53L8CX_WrByte(&(p_dev->platform), 0x7fff, 0x00);
+  status |= VL53L8CX_WrByte(&(p_dev->platform), 0x0009, 0x04);
 
-  status |= WrByte(&(p_dev->platform), 0x0101, 0x00);
-  status |= WrByte(&(p_dev->platform), 0x0102, 0x00);
-  status |= WrByte(&(p_dev->platform), 0x010A, 0x01);
-  status |= WrByte(&(p_dev->platform), 0x4002, 0x01);
-  status |= WrByte(&(p_dev->platform), 0x4002, 0x00);
-  status |= WrByte(&(p_dev->platform), 0x010A, 0x03);
-  status |= WrByte(&(p_dev->platform), 0x0103, 0x01);
-  status |= WrByte(&(p_dev->platform), 0x000C, 0x00);
-  status |= WrByte(&(p_dev->platform), 0x000F, 0x43);
-  status |= WaitMs(&(p_dev->platform), 1);
+  status |= VL53L8CX_WrByte(&(p_dev->platform), 0x000F, 0x40);
+  status |= VL53L8CX_WrByte(&(p_dev->platform), 0x000A, 0x03);
+  status |= VL53L8CX_RdByte(&(p_dev->platform), 0x7FFF, &tmp);
+  status |= VL53L8CX_WrByte(&(p_dev->platform), 0x000C, 0x01);
 
-  status |= WrByte(&(p_dev->platform), 0x000F, 0x40);
-  status |= WrByte(&(p_dev->platform), 0x000A, 0x01);
-  status |= WaitMs(&(p_dev->platform), 100);
+  status |= VL53L8CX_WrByte(&(p_dev->platform), 0x0101, 0x00);
+  status |= VL53L8CX_WrByte(&(p_dev->platform), 0x0102, 0x00);
+  status |= VL53L8CX_WrByte(&(p_dev->platform), 0x010A, 0x01);
+  status |= VL53L8CX_WrByte(&(p_dev->platform), 0x4002, 0x01);
+  status |= VL53L8CX_WrByte(&(p_dev->platform), 0x4002, 0x00);
+  status |= VL53L8CX_WrByte(&(p_dev->platform), 0x010A, 0x03);
+  status |= VL53L8CX_WrByte(&(p_dev->platform), 0x0103, 0x01);
+  status |= VL53L8CX_WrByte(&(p_dev->platform), 0x000C, 0x00);
+  status |= VL53L8CX_WrByte(&(p_dev->platform), 0x000F, 0x43);
+  status |= VL53L8CX_WaitMs(&(p_dev->platform), 1);
+  status |= VL53L8CX_WrByte(&(p_dev->platform), 0x000F, 0x40);
+  status |= VL53L8CX_WrByte(&(p_dev->platform), 0x000A, 0x01);
+
+  status |= VL53L8CX_WaitMs(&(p_dev->platform), 100);
   /* Wait for sensor booted (several ms required to get sensor ready ) */
-  status |= WrByte(&(p_dev->platform), 0x7fff, 0x00);
-  status |= _vl53l8cx_poll_for_answer(1, 0, 0x06, 0xff, 1);
+  status |= VL53L8CX_WrByte(&(p_dev->platform), 0x7fff, 0x00);
+  status |= _vl53l8cx_poll_for_answer(p_dev, 1, 0, 0x06, 0xff, 1);
   if (status != (uint8_t)0) {
     goto exit;
   }
 
-  status |= WrByte(&(p_dev->platform), 0x000E, 0x01);
-  status |= WrByte(&(p_dev->platform), 0x7fff, 0x02);
+  status |= VL53L8CX_WrByte(&(p_dev->platform), 0x000E, 0x01);
+  status |= VL53L8CX_WrByte(&(p_dev->platform), 0x7fff, 0x02);
 
   /* Enable FW access */
-  status |= WrByte(&(p_dev->platform), 0x7fff, 0x01);
-  status |= WrByte(&(p_dev->platform), 0x06, 0x01);
-  status |= _vl53l8cx_poll_for_answer(1, 0, 0x21, 0xFF, 0x4);
+  status |= VL53L8CX_WrByte(&(p_dev->platform), 0x7fff, 0x01);
+  status |= VL53L8CX_WrByte(&(p_dev->platform), 0x06, 0x01);
+  status |= _vl53l8cx_poll_for_answer(p_dev, 1, 0, 0x21, 0xFF, 0x4);
 
-  status |= WrByte(&(p_dev->platform), 0x7fff, 0x00);
+  status |= VL53L8CX_WrByte(&(p_dev->platform), 0x7fff, 0x00);
 
   /* Enable host access to GO1 */
-  status |= RdByte(&(p_dev->platform), 0x7fff, &tmp);
-  status |= WrByte(&(p_dev->platform), 0x0C, 0x01);
+  status |= VL53L8CX_RdByte(&(p_dev->platform), 0x7fff, &tmp);
+  status |= VL53L8CX_WrByte(&(p_dev->platform), 0x0C, 0x01);
 
   /* Power ON status */
-  status |= WrByte(&(p_dev->platform), 0x7fff, 0x00);
-  status |= WrByte(&(p_dev->platform), 0x101, 0x00);
-  status |= WrByte(&(p_dev->platform), 0x102, 0x00);
-  status |= WrByte(&(p_dev->platform), 0x010A, 0x01);
-  status |= WrByte(&(p_dev->platform), 0x4002, 0x01);
-  status |= WrByte(&(p_dev->platform), 0x4002, 0x00);
-  status |= WrByte(&(p_dev->platform), 0x010A, 0x03);
-  status |= WrByte(&(p_dev->platform), 0x103, 0x01);
-  status |= WrByte(&(p_dev->platform), 0x400F, 0x00);
-  status |= WrByte(&(p_dev->platform), 0x21A, 0x43);
-  status |= WrByte(&(p_dev->platform), 0x21A, 0x03);
-  status |= WrByte(&(p_dev->platform), 0x21A, 0x01);
-  status |= WrByte(&(p_dev->platform), 0x21A, 0x00);
-  status |= WrByte(&(p_dev->platform), 0x219, 0x00);
-  status |= WrByte(&(p_dev->platform), 0x21B, 0x00);
+  status |= VL53L8CX_WrByte(&(p_dev->platform), 0x7fff, 0x00);
+  status |= VL53L8CX_WrByte(&(p_dev->platform), 0x101, 0x00);
+  status |= VL53L8CX_WrByte(&(p_dev->platform), 0x102, 0x00);
+  status |= VL53L8CX_WrByte(&(p_dev->platform), 0x010A, 0x01);
+  status |= VL53L8CX_WrByte(&(p_dev->platform), 0x4002, 0x01);
+  status |= VL53L8CX_WrByte(&(p_dev->platform), 0x4002, 0x00);
+  status |= VL53L8CX_WrByte(&(p_dev->platform), 0x010A, 0x03);
+  status |= VL53L8CX_WrByte(&(p_dev->platform), 0x103, 0x01);
+  status |= VL53L8CX_WrByte(&(p_dev->platform), 0x400F, 0x00);
+  status |= VL53L8CX_WrByte(&(p_dev->platform), 0x21A, 0x43);
+  status |= VL53L8CX_WrByte(&(p_dev->platform), 0x21A, 0x03);
+  status |= VL53L8CX_WrByte(&(p_dev->platform), 0x21A, 0x01);
+  status |= VL53L8CX_WrByte(&(p_dev->platform), 0x21A, 0x00);
+  status |= VL53L8CX_WrByte(&(p_dev->platform), 0x219, 0x00);
+  status |= VL53L8CX_WrByte(&(p_dev->platform), 0x21B, 0x00);
 
   /* Wake up MCU */
-  status |= WrByte(&(p_dev->platform), 0x7fff, 0x00);
-  status |= RdByte(&(p_dev->platform), 0x7fff, &tmp);
-
-  status |= WrByte(&(p_dev->platform), 0x7fff, 0x01);
-  status |= WrByte(&(p_dev->platform), 0x20, 0x07);
-  status |= WrByte(&(p_dev->platform), 0x20, 0x06);
+  status |= VL53L8CX_WrByte(&(p_dev->platform), 0x7fff, 0x00);
+  status |= VL53L8CX_RdByte(&(p_dev->platform), 0x7fff, &tmp);
+  status |= VL53L8CX_WrByte(&(p_dev->platform), 0x7fff, 0x01);
 
   /* Download FW into VL53L8CX */
-  status |= WrByte(&(p_dev->platform), 0x7fff, 0x09);
-  status |= WrMulti(&(p_dev->platform), 0,
-                    (uint8_t *)&VL53L8CX_FIRMWARE[0], 0x8000);
-  status |= WrByte(&(p_dev->platform), 0x7fff, 0x0a);
-  status |= WrMulti(&(p_dev->platform), 0,
-                    (uint8_t *)&VL53L8CX_FIRMWARE[0x8000], 0x8000);
-  status |= WrByte(&(p_dev->platform), 0x7fff, 0x0b);
-  status |= WrMulti(&(p_dev->platform), 0,
-                    (uint8_t *)&VL53L8CX_FIRMWARE[0x10000], 0x5000);
-
-  status |= WrByte(&(p_dev->platform), 0x7fff, 0x01);
+  status |= VL53L8CX_WrByte(&(p_dev->platform), 0x7fff, 0x09);
+  status |= VL53L8CX_WrMulti(&(p_dev->platform), 0,
+                             (uint8_t *)&VL53L8CX_FIRMWARE[0], 0x8000);
+  status |= VL53L8CX_WrByte(&(p_dev->platform), 0x7fff, 0x0a);
+  status |= VL53L8CX_WrMulti(&(p_dev->platform), 0,
+                             (uint8_t *)&VL53L8CX_FIRMWARE[0x8000], 0x8000);
+  status |= VL53L8CX_WrByte(&(p_dev->platform), 0x7fff, 0x0b);
+  status |= VL53L8CX_WrMulti(&(p_dev->platform), 0,
+                             (uint8_t *)&VL53L8CX_FIRMWARE[0x10000], 0x5000);
+  status |= VL53L8CX_WrByte(&(p_dev->platform), 0x7fff, 0x01);
 
   /* Check if FW correctly downloaded */
-  status |= WrByte(&(p_dev->platform), 0x7fff, 0x01);
-  status |= WrByte(&(p_dev->platform), 0x06, 0x03);
+  status |= VL53L8CX_WrByte(&(p_dev->platform), 0x7fff, 0x01);
+  status |= VL53L8CX_WrByte(&(p_dev->platform), 0x06, 0x03);
 
-  status |= WaitMs(&(p_dev->platform), 5);
-  status |= WrByte(&(p_dev->platform), 0x7fff, 0x00);
-  status |= RdByte(&(p_dev->platform), 0x7fff, &tmp);
-  status |= WrByte(&(p_dev->platform), 0x0C, 0x01);
+  status |= VL53L8CX_WaitMs(&(p_dev->platform), 5);
+  status |= VL53L8CX_WrByte(&(p_dev->platform), 0x7fff, 0x00);
+  status |= VL53L8CX_RdByte(&(p_dev->platform), 0x7fff, &tmp);
+  status |= VL53L8CX_WrByte(&(p_dev->platform), 0x0C, 0x01);
 
   /* Reset MCU and wait boot */
-  status |= WrByte(&(p_dev->platform), 0x7FFF, 0x00);
-  status |= WrByte(&(p_dev->platform), 0x114, 0x00);
-  status |= WrByte(&(p_dev->platform), 0x115, 0x00);
-  status |= WrByte(&(p_dev->platform), 0x116, 0x42);
-  status |= WrByte(&(p_dev->platform), 0x117, 0x00);
-  status |= WrByte(&(p_dev->platform), 0x0B, 0x00);
-  status |= RdByte(&(p_dev->platform), 0x7fff, &tmp);
-  status |= WrByte(&(p_dev->platform), 0x0C, 0x00);
-  status |= WrByte(&(p_dev->platform), 0x0B, 0x01);
+  status |= VL53L8CX_WrByte(&(p_dev->platform), 0x7FFF, 0x00);
+  status |= VL53L8CX_WrByte(&(p_dev->platform), 0x114, 0x00);
+  status |= VL53L8CX_WrByte(&(p_dev->platform), 0x115, 0x00);
+  status |= VL53L8CX_WrByte(&(p_dev->platform), 0x116, 0x42);
+  status |= VL53L8CX_WrByte(&(p_dev->platform), 0x117, 0x00);
+  status |= VL53L8CX_WrByte(&(p_dev->platform), 0x0B, 0x00);
+  status |= VL53L8CX_RdByte(&(p_dev->platform), 0x7fff, &tmp);
+  status |= VL53L8CX_WrByte(&(p_dev->platform), 0x0C, 0x00);
+  status |= VL53L8CX_WrByte(&(p_dev->platform), 0x0B, 0x01);
 
-  status |= _vl53l8cx_poll_for_mcu_boot();
+  status |= _vl53l8cx_poll_for_mcu_boot(p_dev);
   if (status != (uint8_t)0) {
     goto exit;
   }
 
-  status |= WrByte(&(p_dev->platform), 0x7fff, 0x02);
+  status |= VL53L8CX_WrByte(&(p_dev->platform), 0x7fff, 0x02);
+
+  /* Firmware checksum */
+  status |= VL53L8CX_RdMulti(&(p_dev->platform), (uint16_t)(0x812FFC & 0xFFFF),
+                             p_dev->temp_buffer, 4);
+  VL53L8CX_SwapBuffer(p_dev->temp_buffer, 4);
+  memcpy((uint8_t *)&crc_checksum, &(p_dev->temp_buffer[0]), 4);
+  if (crc_checksum != (uint32_t)0xc0b6c9e) {
+    status |= VL53L8CX_STATUS_FW_CHECKSUM_FAIL;
+    goto exit;
+  }
 
   /* Get offset NVM data and store them into the offset buffer */
-  status |= WrMulti(&(p_dev->platform), 0x2fd8,
-                    (uint8_t *)VL53L8CX_GET_NVM_CMD, sizeof(VL53L8CX_GET_NVM_CMD));
-  status |= _vl53l8cx_poll_for_answer(4, 0,
+  status |= VL53L8CX_WrMulti(&(p_dev->platform), 0x2fd8,
+                             (uint8_t *)VL53L8CX_GET_NVM_CMD, sizeof(VL53L8CX_GET_NVM_CMD));
+  status |= _vl53l8cx_poll_for_answer(p_dev, 4, 0,
                                       VL53L8CX_UI_CMD_STATUS, 0xff, 2);
-  status |= RdMulti(&(p_dev->platform), VL53L8CX_UI_CMD_START,
-                    p_dev->temp_buffer, VL53L8CX_NVM_DATA_SIZE);
+  status |= VL53L8CX_RdMulti(&(p_dev->platform), VL53L8CX_UI_CMD_START,
+                             p_dev->temp_buffer, VL53L8CX_NVM_DATA_SIZE);
   (void)memcpy(p_dev->offset_data, p_dev->temp_buffer,
                VL53L8CX_OFFSET_BUFFER_SIZE);
-  status |= _vl53l8cx_send_offset_data(VL53L8CX_RESOLUTION_4X4);
+  status |= _vl53l8cx_send_offset_data(p_dev, VL53L8CX_RESOLUTION_4X4);
+
   /* Set default Xtalk shape. Send Xtalk to sensor */
   (void)memcpy(p_dev->xtalk_data, (uint8_t *)VL53L8CX_DEFAULT_XTALK,
                VL53L8CX_XTALK_BUFFER_SIZE);
-
-  status |= _vl53l8cx_send_xtalk_data(VL53L8CX_RESOLUTION_4X4);
+  status |= _vl53l8cx_send_xtalk_data(p_dev, VL53L8CX_RESOLUTION_4X4);
 
   /* Send default configuration to VL53L8CX firmware */
-  status |= WrMulti(&(p_dev->platform), 0x2c34,
-                    p_dev->default_configuration,
-                    sizeof(VL53L8CX_DEFAULT_CONFIGURATION));
-  status |= _vl53l8cx_poll_for_answer(4, 1,
+  status |= VL53L8CX_WrMulti(&(p_dev->platform), 0x2c34,
+                             p_dev->default_configuration,
+                             sizeof(VL53L8CX_DEFAULT_CONFIGURATION));
+  status |= _vl53l8cx_poll_for_answer(p_dev, 4, 1,
                                       VL53L8CX_UI_CMD_STATUS, 0xff, 0x03);
-  status |= vl53l8cx_dci_write_data((uint8_t *)&pipe_ctrl,
-                                    VL53L8CX_DCI_PIPE_CONTROL, (uint16_t)sizeof(pipe_ctrl));
 
+  status |= vl53l8cx_dci_write_data(p_dev, (uint8_t *)&pipe_ctrl,
+                                    VL53L8CX_DCI_PIPE_CONTROL, (uint16_t)sizeof(pipe_ctrl));
 #if VL53L8CX_NB_TARGET_PER_ZONE != 1
   tmp = VL53L8CX_NB_TARGET_PER_ZONE;
-  status |= vl53l8cx_dci_replace_data(p_dev->temp_buffer,
+  status |= vl53l8cx_dci_replace_data(p_dev, p_dev->temp_buffer,
                                       VL53L8CX_DCI_FW_NB_TARGET, 16,
                                       (uint8_t *)&tmp, 1, 0x0C);
 #endif
 
-  status |= vl53l8cx_dci_write_data((uint8_t *)&single_range,
+  status |= vl53l8cx_dci_write_data(p_dev, (uint8_t *)&single_range,
                                     VL53L8CX_DCI_SINGLE_RANGE,
                                     (uint16_t)sizeof(single_range));
 
@@ -401,31 +394,40 @@ exit:
   return status;
 }
 
-uint8_t VL53L8CX::vl53l8cx_set_i2c_address(uint16_t i2c_address)
+uint8_t vl53l8cx_set_i2c_address(
+  VL53L8CX_Configuration    *p_dev,
+  uint16_t            i2c_address)
 {
   uint8_t status = VL53L8CX_STATUS_OK;
 
-  status |= WrByte(&(p_dev->platform), 0x7fff, 0x00);
-  status |= WrByte(&(p_dev->platform), 0x4, (uint8_t)(i2c_address >> 1));
+  status |= VL53L8CX_WrByte(&(p_dev->platform), 0x7fff, 0x00);
+  status |= VL53L8CX_WrByte(&(p_dev->platform), 0x4, (uint8_t)(i2c_address >> 1));
   p_dev->platform.address = i2c_address;
-  status |= WrByte(&(p_dev->platform), 0x7fff, 0x02);
+  status |= VL53L8CX_WrByte(&(p_dev->platform), 0x7fff, 0x02);
 
   return status;
 }
 
-uint8_t VL53L8CX::vl53l8cx_get_power_mode(uint8_t *p_power_mode)
+uint8_t vl53l8cx_get_power_mode(
+  VL53L8CX_Configuration    *p_dev,
+  uint8_t       *p_power_mode)
 {
   uint8_t tmp, status = VL53L8CX_STATUS_OK;
 
-  status |= WrByte(&(p_dev->platform), 0x7FFF, 0x00);
-  status |= RdByte(&(p_dev->platform), 0x009, &tmp);
+  status |= VL53L8CX_WrByte(&(p_dev->platform), 0x7FFF, 0x00);
+  status |= VL53L8CX_RdByte(&(p_dev->platform), 0x009, &tmp);
 
   switch (tmp) {
     case 0x4:
       *p_power_mode = VL53L8CX_POWER_MODE_WAKEUP;
       break;
     case 0x2:
-      *p_power_mode = VL53L8CX_POWER_MODE_SLEEP;
+      status |= VL53L8CX_RdByte(&(p_dev->platform), 0x000F, &tmp);
+      if (tmp == 0x43) {
+        *p_power_mode = VL53L8CX_POWER_MODE_DEEP_SLEEP;
+      } else {
+        *p_power_mode = VL53L8CX_POWER_MODE_SLEEP;
+      }
 
       break;
     default:
@@ -434,43 +436,61 @@ uint8_t VL53L8CX::vl53l8cx_get_power_mode(uint8_t *p_power_mode)
       break;
   }
 
-  status |= WrByte(&(p_dev->platform), 0x7FFF, 0x02);
+  status |= VL53L8CX_WrByte(&(p_dev->platform), 0x7FFF, 0x02);
 
   return status;
 }
 
-uint8_t VL53L8CX::vl53l8cx_set_power_mode(uint8_t power_mode)
+uint8_t vl53l8cx_set_power_mode(
+  VL53L8CX_Configuration    *p_dev,
+  uint8_t             power_mode)
 {
-  uint8_t current_power_mode, status = VL53L8CX_STATUS_OK;
+  uint8_t current_power_mode, stored_mode, status = VL53L8CX_STATUS_OK;
 
-  status |= vl53l8cx_get_power_mode(&current_power_mode);
+  status |= vl53l8cx_get_power_mode(p_dev, &current_power_mode);
   if (power_mode != current_power_mode) {
     switch (power_mode) {
       case VL53L8CX_POWER_MODE_WAKEUP:
-        status |= WrByte(&(p_dev->platform), 0x7FFF, 0x00);
-        status |= WrByte(&(p_dev->platform), 0x09, 0x04);
+        status |= VL53L8CX_WrByte(&(p_dev->platform), 0x7FFF, 0x00);
+        status |= VL53L8CX_WrByte(&(p_dev->platform), 0x09, 0x04);
+        status |= VL53L8CX_RdByte(&(p_dev->platform), 0x000F, &stored_mode);
+        if (stored_mode == 0x43) { /* Only for deep sleep mode */
+          status |= VL53L8CX_WrByte(&(p_dev->platform), 0x000F, 0x40);
+        }
         status |= _vl53l8cx_poll_for_answer(
-                    1, 0, 0x06, 0x01, 1);
+                    p_dev, 1, 0, 0x06, 0x01, 1);
+        if (stored_mode == 0x43) { /* Only for deep sleep mode */
+          status |= vl53l8cx_init(p_dev);
+        }
         break;
 
       case VL53L8CX_POWER_MODE_SLEEP:
-        status |= WrByte(&(p_dev->platform), 0x7FFF, 0x00);
-        status |= WrByte(&(p_dev->platform), 0x09, 0x02);
+        status |= VL53L8CX_WrByte(&(p_dev->platform), 0x7FFF, 0x00);
+        status |= VL53L8CX_WrByte(&(p_dev->platform), 0x09, 0x02);
         status |= _vl53l8cx_poll_for_answer(
-                    1, 0, 0x06, 0x01, 0);
+                    p_dev, 1, 0, 0x06, 0x01, 0);
+        break;
+
+      case VL53L8CX_POWER_MODE_DEEP_SLEEP:
+        status |= VL53L8CX_WrByte(&(p_dev->platform), 0x7FFF, 0x00);
+        status |= VL53L8CX_WrByte(&(p_dev->platform), 0x09, 0x02);
+        status |= _vl53l8cx_poll_for_answer(
+                    p_dev, 1, 0, 0x06, 0x01, 0);
+        status |= VL53L8CX_WrByte(&(p_dev->platform), 0x000F, 0x43);
         break;
 
       default:
         status = VL53L8CX_STATUS_ERROR;
         break;
     }
-    status |= WrByte(&(p_dev->platform), 0x7FFF, 0x02);
+    status |= VL53L8CX_WrByte(&(p_dev->platform), 0x7FFF, 0x02);
   }
 
   return status;
 }
 
-uint8_t VL53L8CX::vl53l8cx_start_ranging()
+uint8_t vl53l8cx_start_ranging(
+  VL53L8CX_Configuration    *p_dev)
 {
   uint8_t resolution, status = VL53L8CX_STATUS_OK;
   uint16_t tmp;
@@ -479,8 +499,8 @@ uint8_t VL53L8CX::vl53l8cx_start_ranging()
 
   union Block_header *bh_ptr;
   uint8_t cmd[] = {0x00, 0x03, 0x00, 0x00};
-  status |= vl53l8cx_get_resolution(&resolution);
 
+  status |= vl53l8cx_get_resolution(p_dev, &resolution);
   p_dev->data_read_size = 0;
   p_dev->streamcount = 255;
 
@@ -491,6 +511,7 @@ uint8_t VL53L8CX::vl53l8cx_start_ranging()
     0x00000000U,
     0xC0000000U
   };
+
   /* Send addresses of possible output */
   uint32_t output[] = {VL53L8CX_START_BH,
                        VL53L8CX_METADATA_BH,
@@ -561,69 +582,71 @@ uint8_t VL53L8CX::vl53l8cx_start_ranging()
   }
   p_dev->data_read_size += (uint32_t)24;
 
-  status |= vl53l8cx_dci_write_data(
-              (uint8_t *) & (output), VL53L8CX_DCI_OUTPUT_LIST,
-              (uint16_t)sizeof(output));
+  status |= vl53l8cx_dci_write_data(p_dev,
+                                    (uint8_t *) & (output), VL53L8CX_DCI_OUTPUT_LIST,
+                                    (uint16_t)sizeof(output));
 
   header_config[0] = p_dev->data_read_size;
   header_config[1] = i + (uint32_t)1;
 
-  status |= vl53l8cx_dci_write_data(
-              (uint8_t *) & (header_config), VL53L8CX_DCI_OUTPUT_CONFIG,
-              (uint16_t)sizeof(header_config));
+  status |= vl53l8cx_dci_write_data(p_dev,
+                                    (uint8_t *) & (header_config), VL53L8CX_DCI_OUTPUT_CONFIG,
+                                    (uint16_t)sizeof(header_config));
 
-  status |= vl53l8cx_dci_write_data(
-              (uint8_t *) & (output_bh_enable), VL53L8CX_DCI_OUTPUT_ENABLES,
-              (uint16_t)sizeof(output_bh_enable));
+  status |= vl53l8cx_dci_write_data(p_dev,
+                                    (uint8_t *) & (output_bh_enable), VL53L8CX_DCI_OUTPUT_ENABLES,
+                                    (uint16_t)sizeof(output_bh_enable));
 
   /* Start xshut bypass (interrupt mode) */
-  status |= WrByte(&(p_dev->platform), 0x7fff, 0x00);
-  status |= WrByte(&(p_dev->platform), 0x09, 0x05);
-  status |= WrByte(&(p_dev->platform), 0x7fff, 0x02);
+  status |= VL53L8CX_WrByte(&(p_dev->platform), 0x7fff, 0x00);
+  status |= VL53L8CX_WrByte(&(p_dev->platform), 0x09, 0x05);
+  status |= VL53L8CX_WrByte(&(p_dev->platform), 0x7fff, 0x02);
 
   /* Start ranging session */
-  status |= WrMulti(&(p_dev->platform), VL53L8CX_UI_CMD_END -
-                    (uint16_t)(4 - 1), (uint8_t *)cmd, sizeof(cmd));
-
-  status |= _vl53l8cx_poll_for_answer(4, 1,
+  status |= VL53L8CX_WrMulti(&(p_dev->platform), VL53L8CX_UI_CMD_END -
+                             (uint16_t)(4 - 1), (uint8_t *)cmd, sizeof(cmd));
+  status |= _vl53l8cx_poll_for_answer(p_dev, 4, 1,
                                       VL53L8CX_UI_CMD_STATUS, 0xff, 0x03);
 
   /* Read ui range data content and compare if data size is the correct one */
-  status |= vl53l8cx_dci_read_data(
-              (uint8_t *)p_dev->temp_buffer, 0x5440, 12);
+  status |= vl53l8cx_dci_read_data(p_dev,
+                                   (uint8_t *)p_dev->temp_buffer, 0x5440, 12);
   (void)memcpy(&tmp, &(p_dev->temp_buffer[0x8]), sizeof(tmp));
   if (tmp != p_dev->data_read_size) {
     status |= VL53L8CX_STATUS_ERROR;
   }
 
   /* Ensure that there is no laser safety fault */
-  status |= vl53l8cx_dci_read_data(
-              (uint8_t *)p_dev->temp_buffer, 0xE0C4, 8);
+  status |= vl53l8cx_dci_read_data(p_dev,
+                                   (uint8_t *)p_dev->temp_buffer, 0xE0C4, 8);
   if ((uint8_t)p_dev->temp_buffer[0x6] != (uint8_t)0) {
     status |= VL53L8CX_STATUS_LASER_SAFETY;
   }
+
   return status;
 }
 
-uint8_t VL53L8CX::vl53l8cx_stop_ranging()
+uint8_t vl53l8cx_stop_ranging(
+  VL53L8CX_Configuration    *p_dev)
 {
   uint8_t tmp = 0, status = VL53L8CX_STATUS_OK;
   uint16_t timeout = 0;
   uint32_t auto_stop_flag = 0;
 
-  status |= RdMulti(&(p_dev->platform),
-                    0x2FFC, (uint8_t *)&auto_stop_flag, 4);
-  if (auto_stop_flag != (uint32_t)0x4FF) {
-    status |= WrByte(&(p_dev->platform), 0x7fff, 0x00);
+  status |= VL53L8CX_RdMulti(&(p_dev->platform),
+                             0x2FFC, (uint8_t *)&auto_stop_flag, 4);
+  if ((auto_stop_flag != (uint32_t)0x4FF)
+      && (p_dev->is_auto_stop_enabled == (uint8_t)0)) {
+    status |= VL53L8CX_WrByte(&(p_dev->platform), 0x7fff, 0x00);
 
     /* Provoke MCU stop */
-    status |= WrByte(&(p_dev->platform), 0x15, 0x16);
-    status |= WrByte(&(p_dev->platform), 0x14, 0x01);
+    status |= VL53L8CX_WrByte(&(p_dev->platform), 0x15, 0x16);
+    status |= VL53L8CX_WrByte(&(p_dev->platform), 0x14, 0x01);
 
     /* Poll for G02 status 0 MCU stop */
     while (((tmp & (uint8_t)0x80) >> 7) == (uint8_t)0x00) {
-      status |= RdByte(&(p_dev->platform), 0x6, &tmp);
-      status |= WaitMs(&(p_dev->platform), 10);
+      status |= VL53L8CX_RdByte(&(p_dev->platform), 0x6, &tmp);
+      status |= VL53L8CX_WaitMs(&(p_dev->platform), 10);
       timeout++;  /* Timeout reached after 5 seconds */
 
       if (timeout > (uint16_t)500) {
@@ -634,31 +657,33 @@ uint8_t VL53L8CX::vl53l8cx_stop_ranging()
   }
 
   /* Check GO2 status 1 if status is still OK */
-  status |= RdByte(&(p_dev->platform), 0x6, &tmp);
+  status |= VL53L8CX_RdByte(&(p_dev->platform), 0x6, &tmp);
   if ((tmp & (uint8_t)0x80) != (uint8_t)0) {
-    status |= RdByte(&(p_dev->platform), 0x7, &tmp);
+    status |= VL53L8CX_RdByte(&(p_dev->platform), 0x7, &tmp);
     if ((tmp != (uint8_t)0x84) && (tmp != (uint8_t)0x85)) {
       status |= tmp;
     }
   }
 
   /* Undo MCU stop */
-  status |= WrByte(&(p_dev->platform), 0x7fff, 0x00);
-  status |= WrByte(&(p_dev->platform), 0x14, 0x00);
-  status |= WrByte(&(p_dev->platform), 0x15, 0x00);
+  status |= VL53L8CX_WrByte(&(p_dev->platform), 0x7fff, 0x00);
+  status |= VL53L8CX_WrByte(&(p_dev->platform), 0x14, 0x00);
+  status |= VL53L8CX_WrByte(&(p_dev->platform), 0x15, 0x00);
 
   /* Stop xshut bypass */
-  status |= WrByte(&(p_dev->platform), 0x09, 0x04);
-  status |= WrByte(&(p_dev->platform), 0x7fff, 0x02);
+  status |= VL53L8CX_WrByte(&(p_dev->platform), 0x09, 0x04);
+  status |= VL53L8CX_WrByte(&(p_dev->platform), 0x7fff, 0x02);
 
   return status;
 }
 
-uint8_t VL53L8CX::vl53l8cx_check_data_ready(uint8_t *p_isReady)
+uint8_t vl53l8cx_check_data_ready(
+  VL53L8CX_Configuration    *p_dev,
+  uint8_t       *p_isReady)
 {
   uint8_t status = VL53L8CX_STATUS_OK;
 
-  status |= RdMulti(&(p_dev->platform), 0x0, p_dev->temp_buffer, 4);
+  status |= VL53L8CX_RdMulti(&(p_dev->platform), 0x0, p_dev->temp_buffer, 4);
 
   if ((p_dev->temp_buffer[0] != p_dev->streamcount)
       && (p_dev->temp_buffer[0] != (uint8_t)255)
@@ -679,23 +704,25 @@ uint8_t VL53L8CX::vl53l8cx_check_data_ready(uint8_t *p_isReady)
   return status;
 }
 
-uint8_t VL53L8CX::vl53l8cx_get_ranging_data(VL53L8CX_ResultsData *p_results)
+uint8_t vl53l8cx_get_ranging_data(
+  VL53L8CX_Configuration    *p_dev,
+  VL53L8CX_ResultsData    *p_results)
 {
-
   uint8_t status = VL53L8CX_STATUS_OK;
   uint16_t header_id, footer_id;
   union Block_header *bh_ptr;
   uint32_t i, j, msize;
-  status |= RdMulti(&(p_dev->platform), 0x0,
-                    p_dev->temp_buffer, p_dev->data_read_size);
+  status |= VL53L8CX_RdMulti(&(p_dev->platform), 0x0,
+                             p_dev->temp_buffer, p_dev->data_read_size);
   p_dev->streamcount = p_dev->temp_buffer[0];
-  SwapBuffer(p_dev->temp_buffer, (uint16_t)p_dev->data_read_size);
+  VL53L8CX_SwapBuffer(p_dev->temp_buffer, (uint16_t)p_dev->data_read_size);
 
   /* Start conversion at position 16 to avoid headers */
-  for (i = 16U; i < (uint32_t)p_dev->data_read_size; i += 4U) {
+  for (i = (uint32_t)16; i
+       < (uint32_t)p_dev->data_read_size; i += (uint32_t)4) {
     bh_ptr = (union Block_header *) & (p_dev->temp_buffer[i]);
-    if ((bh_ptr->type > 0x1U)
-        && (bh_ptr->type < 0xdU)) {
+    if ((bh_ptr->type > (uint32_t)0x1)
+        && (bh_ptr->type < (uint32_t)0xd)) {
       msize = bh_ptr->type * bh_ptr->size;
     } else {
       msize = bh_ptr->size;
@@ -780,9 +807,6 @@ uint8_t VL53L8CX::vl53l8cx_get_ranging_data(VL53L8CX_ResultsData *p_results)
                              *VL53L8CX_NB_TARGET_PER_ZONE); i++) {
 #ifndef VL53L8CX_DISABLE_DISTANCE_MM
     p_results->distance_mm[i] /= 4;
-    if (p_results->distance_mm[i] < 0) {
-      p_results->distance_mm[i] = 0;
-    }
 #endif
 #ifndef VL53L8CX_DISABLE_REFLECTANCE_PERCENT
     p_results->reflectance[i] /= (uint8_t)2;
@@ -828,70 +852,80 @@ uint8_t VL53L8CX::vl53l8cx_get_ranging_data(VL53L8CX_ResultsData *p_results)
                                              - (uint32_t)4]) << 8) & 0xFF00U;
   footer_id |= ((uint16_t)(p_dev->temp_buffer[p_dev->data_read_size
                                               - (uint32_t)3])) & 0xFFU;
+
   if (header_id != footer_id) {
     status |= VL53L8CX_STATUS_CORRUPTED_FRAME;
   }
+
   return status;
 }
 
-uint8_t VL53L8CX::vl53l8cx_get_resolution(uint8_t *p_resolution)
+uint8_t vl53l8cx_get_resolution(
+  VL53L8CX_Configuration    *p_dev,
+  uint8_t       *p_resolution)
 {
   uint8_t status = VL53L8CX_STATUS_OK;
-  status |= vl53l8cx_dci_read_data(p_dev->temp_buffer,
+
+  status |= vl53l8cx_dci_read_data(p_dev, p_dev->temp_buffer,
                                    VL53L8CX_DCI_ZONE_CONFIG, 8);
   *p_resolution = p_dev->temp_buffer[0x00] * p_dev->temp_buffer[0x01];
+
   return status;
 }
 
-uint8_t VL53L8CX::vl53l8cx_set_resolution(uint8_t resolution)
+
+
+uint8_t vl53l8cx_set_resolution(
+  VL53L8CX_Configuration     *p_dev,
+  uint8_t       resolution)
 {
   uint8_t status = VL53L8CX_STATUS_OK;
 
   switch (resolution) {
     case VL53L8CX_RESOLUTION_4X4:
-      status |= vl53l8cx_dci_read_data(
-                  p_dev->temp_buffer,
-                  VL53L8CX_DCI_DSS_CONFIG, 16);
+      status |= vl53l8cx_dci_read_data(p_dev,
+                                       p_dev->temp_buffer,
+                                       VL53L8CX_DCI_DSS_CONFIG, 16);
       p_dev->temp_buffer[0x04] = 64;
       p_dev->temp_buffer[0x06] = 64;
       p_dev->temp_buffer[0x09] = 4;
-      status |= vl53l8cx_dci_write_data(
-                  p_dev->temp_buffer,
-                  VL53L8CX_DCI_DSS_CONFIG, 16);
+      status |= vl53l8cx_dci_write_data(p_dev,
+                                        p_dev->temp_buffer,
+                                        VL53L8CX_DCI_DSS_CONFIG, 16);
 
-      status |= vl53l8cx_dci_read_data(
-                  p_dev->temp_buffer,
-                  VL53L8CX_DCI_ZONE_CONFIG, 8);
+      status |= vl53l8cx_dci_read_data(p_dev,
+                                       p_dev->temp_buffer,
+                                       VL53L8CX_DCI_ZONE_CONFIG, 8);
       p_dev->temp_buffer[0x00] = 4;
       p_dev->temp_buffer[0x01] = 4;
       p_dev->temp_buffer[0x04] = 8;
       p_dev->temp_buffer[0x05] = 8;
-      status |= vl53l8cx_dci_write_data(
-                  p_dev->temp_buffer,
-                  VL53L8CX_DCI_ZONE_CONFIG, 8);
+      status |= vl53l8cx_dci_write_data(p_dev,
+                                        p_dev->temp_buffer,
+                                        VL53L8CX_DCI_ZONE_CONFIG, 8);
       break;
 
     case VL53L8CX_RESOLUTION_8X8:
-      status |= vl53l8cx_dci_read_data(
-                  p_dev->temp_buffer,
-                  VL53L8CX_DCI_DSS_CONFIG, 16);
+      status |= vl53l8cx_dci_read_data(p_dev,
+                                       p_dev->temp_buffer,
+                                       VL53L8CX_DCI_DSS_CONFIG, 16);
       p_dev->temp_buffer[0x04] = 16;
       p_dev->temp_buffer[0x06] = 16;
       p_dev->temp_buffer[0x09] = 1;
-      status |= vl53l8cx_dci_write_data(
-                  p_dev->temp_buffer,
-                  VL53L8CX_DCI_DSS_CONFIG, 16);
+      status |= vl53l8cx_dci_write_data(p_dev,
+                                        p_dev->temp_buffer,
+                                        VL53L8CX_DCI_DSS_CONFIG, 16);
 
-      status |= vl53l8cx_dci_read_data(
-                  p_dev->temp_buffer,
-                  VL53L8CX_DCI_ZONE_CONFIG, 8);
+      status |= vl53l8cx_dci_read_data(p_dev,
+                                       p_dev->temp_buffer,
+                                       VL53L8CX_DCI_ZONE_CONFIG, 8);
       p_dev->temp_buffer[0x00] = 8;
       p_dev->temp_buffer[0x01] = 8;
       p_dev->temp_buffer[0x04] = 4;
       p_dev->temp_buffer[0x05] = 4;
-      status |= vl53l8cx_dci_write_data(
-                  p_dev->temp_buffer,
-                  VL53L8CX_DCI_ZONE_CONFIG, 8);
+      status |= vl53l8cx_dci_write_data(p_dev,
+                                        p_dev->temp_buffer,
+                                        VL53L8CX_DCI_ZONE_CONFIG, 8);
 
       break;
 
@@ -900,39 +934,45 @@ uint8_t VL53L8CX::vl53l8cx_set_resolution(uint8_t resolution)
       break;
   }
 
-  status |= _vl53l8cx_send_offset_data(resolution);
-  status |= _vl53l8cx_send_xtalk_data(resolution);
+  status |= _vl53l8cx_send_offset_data(p_dev, resolution);
+  status |= _vl53l8cx_send_xtalk_data(p_dev, resolution);
 
   return status;
 }
 
-uint8_t VL53L8CX::vl53l8cx_get_ranging_frequency_hz(uint8_t *p_frequency_hz)
+uint8_t vl53l8cx_get_ranging_frequency_hz(
+  VL53L8CX_Configuration    *p_dev,
+  uint8_t       *p_frequency_hz)
 {
   uint8_t status = VL53L8CX_STATUS_OK;
 
-  status |= vl53l8cx_dci_read_data((uint8_t *)p_dev->temp_buffer,
+  status |= vl53l8cx_dci_read_data(p_dev, (uint8_t *)p_dev->temp_buffer,
                                    VL53L8CX_DCI_FREQ_HZ, 4);
   *p_frequency_hz = p_dev->temp_buffer[0x01];
 
   return status;
 }
 
-uint8_t VL53L8CX::vl53l8cx_set_ranging_frequency_hz(uint8_t frequency_hz)
+uint8_t vl53l8cx_set_ranging_frequency_hz(
+  VL53L8CX_Configuration    *p_dev,
+  uint8_t       frequency_hz)
 {
   uint8_t status = VL53L8CX_STATUS_OK;
 
-  status |= vl53l8cx_dci_replace_data(p_dev->temp_buffer,
+  status |= vl53l8cx_dci_replace_data(p_dev, p_dev->temp_buffer,
                                       VL53L8CX_DCI_FREQ_HZ, 4,
                                       (uint8_t *)&frequency_hz, 1, 0x01);
 
   return status;
 }
 
-uint8_t VL53L8CX::vl53l8cx_get_integration_time_ms(uint32_t *p_time_ms)
+uint8_t vl53l8cx_get_integration_time_ms(
+  VL53L8CX_Configuration    *p_dev,
+  uint32_t      *p_time_ms)
 {
   uint8_t status = VL53L8CX_STATUS_OK;
 
-  status |= vl53l8cx_dci_read_data((uint8_t *)p_dev->temp_buffer,
+  status |= vl53l8cx_dci_read_data(p_dev, (uint8_t *)p_dev->temp_buffer,
                                    VL53L8CX_DCI_INT_TIME, 20);
 
   (void)memcpy(p_time_ms, &(p_dev->temp_buffer[0x0]), 4);
@@ -941,7 +981,9 @@ uint8_t VL53L8CX::vl53l8cx_get_integration_time_ms(uint32_t *p_time_ms)
   return status;
 }
 
-uint8_t VL53L8CX::vl53l8cx_set_integration_time_ms(uint32_t integration_time_ms)
+uint8_t vl53l8cx_set_integration_time_ms(
+  VL53L8CX_Configuration    *p_dev,
+  uint32_t      integration_time_ms)
 {
   uint8_t status = VL53L8CX_STATUS_OK;
   uint32_t integration = integration_time_ms;
@@ -953,7 +995,7 @@ uint8_t VL53L8CX::vl53l8cx_set_integration_time_ms(uint32_t integration_time_ms)
   } else {
     integration *= (uint32_t)1000;
 
-    status |= vl53l8cx_dci_replace_data(p_dev->temp_buffer,
+    status |= vl53l8cx_dci_replace_data(p_dev, p_dev->temp_buffer,
                                         VL53L8CX_DCI_INT_TIME, 20,
                                         (uint8_t *)&integration, 4, 0x00);
   }
@@ -961,11 +1003,13 @@ uint8_t VL53L8CX::vl53l8cx_set_integration_time_ms(uint32_t integration_time_ms)
   return status;
 }
 
-uint8_t VL53L8CX::vl53l8cx_get_sharpener_percent(uint8_t *p_sharpener_percent)
+uint8_t vl53l8cx_get_sharpener_percent(
+  VL53L8CX_Configuration    *p_dev,
+  uint8_t       *p_sharpener_percent)
 {
   uint8_t status = VL53L8CX_STATUS_OK;
 
-  status |= vl53l8cx_dci_read_data(p_dev->temp_buffer,
+  status |= vl53l8cx_dci_read_data(p_dev, p_dev->temp_buffer,
                                    VL53L8CX_DCI_SHARPENER, 16);
 
   *p_sharpener_percent = (p_dev->temp_buffer[0xD]
@@ -974,7 +1018,9 @@ uint8_t VL53L8CX::vl53l8cx_get_sharpener_percent(uint8_t *p_sharpener_percent)
   return status;
 }
 
-uint8_t VL53L8CX::vl53l8cx_set_sharpener_percent(uint8_t sharpener_percent)
+uint8_t vl53l8cx_set_sharpener_percent(
+  VL53L8CX_Configuration    *p_dev,
+  uint8_t       sharpener_percent)
 {
   uint8_t status = VL53L8CX_STATUS_OK;
   uint8_t sharpener;
@@ -983,7 +1029,7 @@ uint8_t VL53L8CX::vl53l8cx_set_sharpener_percent(uint8_t sharpener_percent)
     status |= VL53L8CX_STATUS_INVALID_PARAM;
   } else {
     sharpener = (sharpener_percent * (uint8_t)255) / (uint8_t)100;
-    status |= vl53l8cx_dci_replace_data(p_dev->temp_buffer,
+    status |= vl53l8cx_dci_replace_data(p_dev, p_dev->temp_buffer,
                                         VL53L8CX_DCI_SHARPENER, 16,
                                         (uint8_t *)&sharpener, 1, 0xD);
   }
@@ -991,24 +1037,28 @@ uint8_t VL53L8CX::vl53l8cx_set_sharpener_percent(uint8_t sharpener_percent)
   return status;
 }
 
-uint8_t VL53L8CX::vl53l8cx_get_target_order(uint8_t  *p_target_order)
+uint8_t vl53l8cx_get_target_order(
+  VL53L8CX_Configuration    *p_dev,
+  uint8_t       *p_target_order)
 {
   uint8_t status = VL53L8CX_STATUS_OK;
 
-  status |= vl53l8cx_dci_read_data((uint8_t *)p_dev->temp_buffer,
+  status |= vl53l8cx_dci_read_data(p_dev, (uint8_t *)p_dev->temp_buffer,
                                    VL53L8CX_DCI_TARGET_ORDER, 4);
   *p_target_order = (uint8_t)p_dev->temp_buffer[0x0];
 
   return status;
 }
 
-uint8_t VL53L8CX::vl53l8cx_set_target_order(uint8_t target_order)
+uint8_t vl53l8cx_set_target_order(
+  VL53L8CX_Configuration    *p_dev,
+  uint8_t       target_order)
 {
   uint8_t status = VL53L8CX_STATUS_OK;
 
   if ((target_order == (uint8_t)VL53L8CX_TARGET_ORDER_CLOSEST)
       || (target_order == (uint8_t)VL53L8CX_TARGET_ORDER_STRONGEST)) {
-    status |= vl53l8cx_dci_replace_data(p_dev->temp_buffer,
+    status |= vl53l8cx_dci_replace_data(p_dev, p_dev->temp_buffer,
                                         VL53L8CX_DCI_TARGET_ORDER, 4,
                                         (uint8_t *)&target_order, 1, 0x0);
   } else {
@@ -1018,11 +1068,13 @@ uint8_t VL53L8CX::vl53l8cx_set_target_order(uint8_t target_order)
   return status;
 }
 
-uint8_t VL53L8CX::vl53l8cx_get_ranging_mode(uint8_t *p_ranging_mode)
+uint8_t vl53l8cx_get_ranging_mode(
+  VL53L8CX_Configuration    *p_dev,
+  uint8_t       *p_ranging_mode)
 {
   uint8_t status = VL53L8CX_STATUS_OK;
 
-  status |= vl53l8cx_dci_read_data(p_dev->temp_buffer,
+  status |= vl53l8cx_dci_read_data(p_dev, p_dev->temp_buffer,
                                    VL53L8CX_DCI_RANGING_MODE, 8);
 
   if (p_dev->temp_buffer[0x01] == (uint8_t)0x1) {
@@ -1034,12 +1086,14 @@ uint8_t VL53L8CX::vl53l8cx_get_ranging_mode(uint8_t *p_ranging_mode)
   return status;
 }
 
-uint8_t VL53L8CX::vl53l8cx_set_ranging_mode(uint8_t ranging_mode)
+uint8_t vl53l8cx_set_ranging_mode(
+  VL53L8CX_Configuration    *p_dev,
+  uint8_t       ranging_mode)
 {
   uint8_t status = VL53L8CX_STATUS_OK;
   uint32_t single_range = 0x00;
 
-  status |= vl53l8cx_dci_read_data(p_dev->temp_buffer,
+  status |= vl53l8cx_dci_read_data(p_dev, p_dev->temp_buffer,
                                    VL53L8CX_DCI_RANGING_MODE, 8);
 
   switch (ranging_mode) {
@@ -1060,22 +1114,23 @@ uint8_t VL53L8CX::vl53l8cx_set_ranging_mode(uint8_t ranging_mode)
       break;
   }
 
-  status |= vl53l8cx_dci_write_data(p_dev->temp_buffer,
+  status |= vl53l8cx_dci_write_data(p_dev, p_dev->temp_buffer,
                                     VL53L8CX_DCI_RANGING_MODE, (uint16_t)8);
 
-  status |= vl53l8cx_dci_write_data((uint8_t *)&single_range,
+  status |= vl53l8cx_dci_write_data(p_dev, (uint8_t *)&single_range,
                                     VL53L8CX_DCI_SINGLE_RANGE,
                                     (uint16_t)sizeof(single_range));
 
   return status;
 }
 
-
-uint8_t VL53L8CX::vl53l8cx_get_external_sync_pin_enable(uint8_t *p_is_sync_pin_enabled)
+uint8_t vl53l8cx_get_external_sync_pin_enable(
+  VL53L8CX_Configuration    *p_dev,
+  uint8_t       *p_is_sync_pin_enabled)
 {
   uint8_t status = VL53L8CX_STATUS_OK;
 
-  status |= vl53l8cx_dci_read_data(p_dev->temp_buffer,
+  status |= vl53l8cx_dci_read_data(p_dev, p_dev->temp_buffer,
                                    VL53L8CX_DCI_SYNC_PIN, 4);
 
   /* Check bit 1 value (get sync pause bit) */
@@ -1088,12 +1143,14 @@ uint8_t VL53L8CX::vl53l8cx_get_external_sync_pin_enable(uint8_t *p_is_sync_pin_e
   return status;
 }
 
-uint8_t VL53L8CX::vl53l8cx_set_external_sync_pin_enable(uint8_t enable_sync_pin)
+uint8_t vl53l8cx_set_external_sync_pin_enable(
+  VL53L8CX_Configuration    *p_dev,
+  uint8_t       enable_sync_pin)
 {
   uint8_t status = VL53L8CX_STATUS_OK;
   uint32_t tmp;
 
-  status |= vl53l8cx_dci_read_data(p_dev->temp_buffer,
+  status |= vl53l8cx_dci_read_data(p_dev, p_dev->temp_buffer,
                                    VL53L8CX_DCI_SYNC_PIN, 4);
   tmp = (uint32_t)p_dev->temp_buffer[3];
 
@@ -1106,13 +1163,40 @@ uint8_t VL53L8CX::vl53l8cx_set_external_sync_pin_enable(uint8_t enable_sync_pin)
   }
 
   p_dev->temp_buffer[3] = (uint8_t)tmp;
-  status |= vl53l8cx_dci_write_data(p_dev->temp_buffer,
+  status |= vl53l8cx_dci_write_data(p_dev, p_dev->temp_buffer,
                                     VL53L8CX_DCI_SYNC_PIN, 4);
 
   return status;
 }
 
-uint8_t VL53L8CX::vl53l8cx_dci_read_data(
+uint8_t vl53l8cx_get_VHV_repeat_count(
+  VL53L8CX_Configuration *p_dev,
+  uint32_t *p_repeat_count)
+{
+  uint8_t status = VL53L8CX_STATUS_OK;
+  status |= vl53l8cx_dci_read_data(p_dev, (uint8_t *)p_dev->temp_buffer,
+                                   VL53L8CX_DCI_VHV_CONFIG, 16);
+
+  *p_repeat_count = ((uint32_t)p_dev->temp_buffer[7] << 24)
+                    | ((uint32_t)p_dev->temp_buffer[6]  << 16)
+                    | ((uint32_t)p_dev->temp_buffer[5]  << 8)
+                    | (uint32_t)p_dev->temp_buffer[4];
+
+  return status;
+}
+
+uint8_t vl53l8cx_set_VHV_repeat_count(
+  VL53L8CX_Configuration *p_dev,
+  uint32_t repeat_count)
+{
+  uint8_t status = VL53L8CX_STATUS_OK;
+  status |= vl53l8cx_dci_replace_data(p_dev, p_dev->temp_buffer,
+                                      VL53L8CX_DCI_VHV_CONFIG, 16, (uint8_t *)&repeat_count, 4, 0x4);
+  return status;
+}
+
+uint8_t vl53l8cx_dci_read_data(
+  VL53L8CX_Configuration    *p_dev,
   uint8_t       *data,
   uint32_t      index,
   uint16_t      data_size)
@@ -1133,18 +1217,19 @@ uint8_t VL53L8CX::vl53l8cx_dci_read_data(
     cmd[1] = (uint8_t)(index & (uint32_t)0xff);
     cmd[2] = (uint8_t)((data_size & (uint16_t)0xff0) >> 4);
     cmd[3] = (uint8_t)((data_size & (uint16_t)0xf) << 4);
+
     /* Request data reading from FW */
-    status |= WrMulti(&(p_dev->platform), (VL53L8CX_UI_CMD_END - (uint16_t)11), cmd, sizeof(cmd));
-    status |= _vl53l8cx_poll_for_answer(4, 1,
+    status |= VL53L8CX_WrMulti(&(p_dev->platform),
+                               (VL53L8CX_UI_CMD_END - (uint16_t)11), cmd, sizeof(cmd));
+    status |= _vl53l8cx_poll_for_answer(p_dev, 4, 1,
                                         VL53L8CX_UI_CMD_STATUS,
                                         0xff, 0x03);
 
-
-
     /* Read new data sent (4 bytes header + data_size + 8 bytes footer) */
-    status |= RdMulti(&(p_dev->platform), VL53L8CX_UI_CMD_START,
-                      p_dev->temp_buffer, rd_size);
-    SwapBuffer(p_dev->temp_buffer, data_size + (uint16_t)12);
+    status |= VL53L8CX_RdMulti(&(p_dev->platform), VL53L8CX_UI_CMD_START,
+                               p_dev->temp_buffer, rd_size);
+    VL53L8CX_SwapBuffer(p_dev->temp_buffer, data_size + (uint16_t)12);
+
     /* Copy data from FW into input structure (-4 bytes to remove header) */
     for (i = 0 ; i < (int16_t)data_size; i++) {
       data[i] = p_dev->temp_buffer[i + 4];
@@ -1154,7 +1239,8 @@ uint8_t VL53L8CX::vl53l8cx_dci_read_data(
   return status;
 }
 
-uint8_t VL53L8CX::vl53l8cx_dci_write_data(
+uint8_t vl53l8cx_dci_write_data(
+  VL53L8CX_Configuration    *p_dev,
   uint8_t       *data,
   uint32_t      index,
   uint16_t      data_size)
@@ -1182,7 +1268,7 @@ uint8_t VL53L8CX::vl53l8cx_dci_write_data(
     headers[3] = (uint8_t)((data_size & (uint16_t)0xf) << 4);
 
     /* Copy data from structure to FW format (+4 bytes to add header) */
-    SwapBuffer(data, data_size);
+    VL53L8CX_SwapBuffer(data, data_size);
     for (i = (int16_t)data_size - (int16_t)1 ; i >= 0; i--) {
       p_dev->temp_buffer[i + 4] = data[i];
     }
@@ -1193,19 +1279,20 @@ uint8_t VL53L8CX::vl53l8cx_dci_write_data(
                  footer, sizeof(footer));
 
     /* Send data to FW */
-    status |= WrMulti(&(p_dev->platform), address,
-                      p_dev->temp_buffer,
-                      (uint32_t)((uint32_t)data_size + (uint32_t)12));
-    status |= _vl53l8cx_poll_for_answer(4, 1,
+    status |= VL53L8CX_WrMulti(&(p_dev->platform), address,
+                               p_dev->temp_buffer,
+                               (uint32_t)((uint32_t)data_size + (uint32_t)12));
+    status |= _vl53l8cx_poll_for_answer(p_dev, 4, 1,
                                         VL53L8CX_UI_CMD_STATUS, 0xff, 0x03);
 
-    SwapBuffer(data, data_size);
+    VL53L8CX_SwapBuffer(data, data_size);
   }
 
   return status;
 }
 
-uint8_t VL53L8CX::vl53l8cx_dci_replace_data(
+uint8_t vl53l8cx_dci_replace_data(
+  VL53L8CX_Configuration    *p_dev,
   uint8_t       *data,
   uint32_t      index,
   uint16_t      data_size,
@@ -1215,9 +1302,9 @@ uint8_t VL53L8CX::vl53l8cx_dci_replace_data(
 {
   uint8_t status = VL53L8CX_STATUS_OK;
 
-  status |= vl53l8cx_dci_read_data(data, index, data_size);
+  status |= vl53l8cx_dci_read_data(p_dev, data, index, data_size);
   (void)memcpy(&(data[new_data_pos]), new_data, new_data_size);
-  status |= vl53l8cx_dci_write_data(data, index, data_size);
+  status |= vl53l8cx_dci_write_data(p_dev, data, index, data_size);
 
   return status;
 }

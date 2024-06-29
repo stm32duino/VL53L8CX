@@ -1,55 +1,32 @@
 /**
- ******************************************************************************
- * @file    vl53l8cx_plugin_detection_thresholds.cpp
- * @author  STMicroelectronics
- * @version V1.0.0
- * @date    13 January 2023
- * @brief   Implementation of the VL53L8CX APIs for thresholds detection.
- ******************************************************************************
- * @attention
- *
- * <h2><center>&copy; COPYRIGHT(c) 2021 STMicroelectronics</center></h2>
- *
- * Redistribution and use in source and binary forms, with or without modification,
- * are permitted provided that the following conditions are met:
- *   1. Redistributions of source code must retain the above copyright notice,
- *      this list of conditions and the following disclaimer.
- *   2. Redistributions in binary form must reproduce the above copyright notice,
- *      this list of conditions and the following disclaimer in the documentation
- *      and/or other materials provided with the distribution.
- *   3. Neither the name of STMicroelectronics nor the names of its contributors
- *      may be used to endorse or promote products derived from this software
- *      without specific prior written permission.
- *
- * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
- * AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
- * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
- * DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
- * FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
- * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
- * SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
- * CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
- * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
- * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
- *
- ******************************************************************************
- */
+  *
+  * Copyright (c) 2021 STMicroelectronics.
+  * All rights reserved.
+  *
+  * This software is licensed under terms that can be found in the LICENSE file
+  * in the root directory of this software component.
+  * If no LICENSE file comes with this software, it is provided AS-IS.
+  *
+  ******************************************************************************
+  */
 
-#include "vl53l8cx_class.h"
+#include "vl53l8cx_plugin_detection_thresholds.h"
 
-uint8_t VL53L8CX::vl53l8cx_get_detection_thresholds_enable(
+uint8_t vl53l8cx_get_detection_thresholds_enable(
+  VL53L8CX_Configuration    *p_dev,
   uint8_t       *p_enabled)
 {
   uint8_t status = VL53L8CX_STATUS_OK;
 
-  status |= vl53l8cx_dci_read_data((uint8_t *)p_dev->temp_buffer,
+  status |= vl53l8cx_dci_read_data(p_dev, (uint8_t *)p_dev->temp_buffer,
                                    VL53L8CX_DCI_DET_THRESH_GLOBAL_CONFIG, 8);
   *p_enabled = p_dev->temp_buffer[0x1];
 
   return status;
 }
 
-uint8_t VL53L8CX::vl53l8cx_set_detection_thresholds_enable(
+uint8_t vl53l8cx_set_detection_thresholds_enable(
+  VL53L8CX_Configuration    *p_dev,
   uint8_t       enabled)
 {
   uint8_t tmp, status = VL53L8CX_STATUS_OK;
@@ -64,25 +41,26 @@ uint8_t VL53L8CX::vl53l8cx_set_detection_thresholds_enable(
   }
 
   /* Set global interrupt config */
-  status |= vl53l8cx_dci_replace_data(p_dev->temp_buffer,
+  status |= vl53l8cx_dci_replace_data(p_dev, p_dev->temp_buffer,
                                       VL53L8CX_DCI_DET_THRESH_GLOBAL_CONFIG, 8,
                                       (uint8_t *)&grp_global_config, 4, 0x00);
 
   /* Update interrupt config */
-  status |= vl53l8cx_dci_replace_data(p_dev->temp_buffer,
+  status |= vl53l8cx_dci_replace_data(p_dev, p_dev->temp_buffer,
                                       VL53L8CX_DCI_DET_THRESH_CONFIG, 20,
                                       (uint8_t *)&tmp, 1, 0x11);
 
   return status;
 }
 
-uint8_t VL53L8CX::vl53l8cx_get_detection_thresholds(
+uint8_t vl53l8cx_get_detection_thresholds(
+  VL53L8CX_Configuration      *p_dev,
   VL53L8CX_DetectionThresholds  *p_thresholds)
 {
   uint8_t i, status = VL53L8CX_STATUS_OK;
 
   /* Get thresholds configuration */
-  status |= vl53l8cx_dci_read_data((uint8_t *)p_thresholds,
+  status |= vl53l8cx_dci_read_data(p_dev, (uint8_t *)p_thresholds,
                                    VL53L8CX_DCI_DET_THRESH_START,
                                    (uint16_t)VL53L8CX_NB_THRESHOLDS
                                    * (uint16_t)sizeof(VL53L8CX_DetectionThresholds));
@@ -121,7 +99,8 @@ uint8_t VL53L8CX::vl53l8cx_get_detection_thresholds(
   return status;
 }
 
-uint8_t VL53L8CX::vl53l8cx_set_detection_thresholds(
+uint8_t vl53l8cx_set_detection_thresholds(
+  VL53L8CX_Configuration      *p_dev,
   VL53L8CX_DetectionThresholds  *p_thresholds)
 {
   uint8_t i, status = VL53L8CX_STATUS_OK;
@@ -161,12 +140,12 @@ uint8_t VL53L8CX::vl53l8cx_set_detection_thresholds(
   }
 
   /* Set valid target list */
-  status |= vl53l8cx_dci_write_data((uint8_t *)grp_valid_target_cfg,
+  status |= vl53l8cx_dci_write_data(p_dev, (uint8_t *)grp_valid_target_cfg,
                                     VL53L8CX_DCI_DET_THRESH_VALID_STATUS,
                                     (uint16_t)sizeof(grp_valid_target_cfg));
 
   /* Set thresholds configuration */
-  status |= vl53l8cx_dci_write_data((uint8_t *)p_thresholds,
+  status |= vl53l8cx_dci_write_data(p_dev, (uint8_t *)p_thresholds,
                                     VL53L8CX_DCI_DET_THRESH_START,
                                     (uint16_t)(VL53L8CX_NB_THRESHOLDS
                                                * sizeof(VL53L8CX_DetectionThresholds)));
@@ -174,27 +153,29 @@ uint8_t VL53L8CX::vl53l8cx_set_detection_thresholds(
   return status;
 }
 
-uint8_t VL53L8CX::vl53l8cx_get_detection_thresholds_auto_stop(
+uint8_t vl53l8cx_get_detection_thresholds_auto_stop(
+  VL53L8CX_Configuration    *p_dev,
   uint8_t       *p_auto_stop)
 {
   uint8_t status = VL53L8CX_STATUS_OK;
 
-  status |= vl53l8cx_dci_read_data((uint8_t *)p_dev->temp_buffer,
+  status |= vl53l8cx_dci_read_data(p_dev, (uint8_t *)p_dev->temp_buffer,
                                    VL53L8CX_DCI_PIPE_CONTROL, 4);
   *p_auto_stop = p_dev->temp_buffer[0x3];
 
   return status;
 }
 
-uint8_t VL53L8CX::vl53l8cx_set_detection_thresholds_auto_stop(
+uint8_t vl53l8cx_set_detection_thresholds_auto_stop(
+  VL53L8CX_Configuration    *p_dev,
   uint8_t       auto_stop)
 {
   uint8_t status = VL53L8CX_STATUS_OK;
 
-  status |= vl53l8cx_dci_replace_data(p_dev->temp_buffer,
+  status |= vl53l8cx_dci_replace_data(p_dev, p_dev->temp_buffer,
                                       VL53L8CX_DCI_PIPE_CONTROL, 4,
                                       (uint8_t *)&auto_stop, 1, 0x03);
+  p_dev->is_auto_stop_enabled = (uint8_t)auto_stop;
 
   return status;
 }
-

@@ -1,44 +1,23 @@
 /**
- ******************************************************************************
- * @file    vl53l8cx_plugin_detection_thresholds.h
- * @author  STMicroelectronics
- * @version V1.0.0
- * @date    13 January 2023
- * @brief   Header file for the VL53L8CX thresholds detection structures.
- ******************************************************************************
- * @attention
- *
- * <h2><center>&copy; COPYRIGHT(c) 2021 STMicroelectronics</center></h2>
- *
- * Redistribution and use in source and binary forms, with or without modification,
- * are permitted provided that the following conditions are met:
- *   1. Redistributions of source code must retain the above copyright notice,
- *      this list of conditions and the following disclaimer.
- *   2. Redistributions in binary form must reproduce the above copyright notice,
- *      this list of conditions and the following disclaimer in the documentation
- *      and/or other materials provided with the distribution.
- *   3. Neither the name of STMicroelectronics nor the names of its contributors
- *      may be used to endorse or promote products derived from this software
- *      without specific prior written permission.
- *
- * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS"
- * AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
- * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
- * DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE
- * FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
- * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR
- * SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
- * CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
- * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
- * OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
- *
- ******************************************************************************
- */
+  *
+  * Copyright (c) 2021 STMicroelectronics.
+  * All rights reserved.
+  *
+  * This software is licensed under terms that can be found in the LICENSE file
+  * in the root directory of this software component.
+  * If no LICENSE file comes with this software, it is provided AS-IS.
+  *
+  ******************************************************************************
+  */
 
 #ifndef VL53L8CX_PLUGIN_DETECTION_THRESHOLDS_H_
 #define VL53L8CX_PLUGIN_DETECTION_THRESHOLDS_H_
 
-#include "vl53l8cx_class.h"
+#ifdef __cplusplus
+extern "C" {
+#endif
+
+#include "vl53l8cx_api.h"
 
 /**
  * @brief Macro VL53L8CX_NB_THRESHOLDS indicates the number of checkers. This
@@ -52,9 +31,9 @@
  */
 
 #define VL53L8CX_DCI_DET_THRESH_CONFIG      ((uint16_t)0x5488U)
-#define VL53L8CX_DCI_DET_THRESH_GLOBAL_CONFIG   ((uint16_t)0xB6E0U)
+#define VL53L8CX_DCI_DET_THRESH_GLOBAL_CONFIG ((uint16_t)0xB6E0U)
 #define VL53L8CX_DCI_DET_THRESH_START     ((uint16_t)0xB6E8U)
-#define VL53L8CX_DCI_DET_THRESH_VALID_STATUS    ((uint16_t)0xB9F0U)
+#define VL53L8CX_DCI_DET_THRESH_VALID_STATUS  ((uint16_t)0xB9F0U)
 
 /**
  * @brief Macro VL53L8CX_LAST_THRESHOLD is used to indicate the end of checkers
@@ -69,13 +48,13 @@
  */
 
 #define VL53L8CX_DISTANCE_MM        ((uint8_t)1U)
-#define VL53L8CX_SIGNAL_PER_SPAD_KCPS             ((uint8_t)2U)
+#define VL53L8CX_SIGNAL_PER_SPAD_KCPS     ((uint8_t)2U)
 #define VL53L8CX_RANGE_SIGMA_MM       ((uint8_t)4U)
-#define VL53L8CX_AMBIENT_PER_SPAD_KCPS      ((uint8_t)8U)
+#define VL53L8CX_AMBIENT_PER_SPAD_KCPS    ((uint8_t)8U)
 #define VL53L8CX_NB_TARGET_DETECTED     ((uint8_t)9U)
 #define VL53L8CX_TARGET_STATUS        ((uint8_t)12U)
 #define VL53L8CX_NB_SPADS_ENABLED     ((uint8_t)13U)
-#define VL53L8CX_MOTION_INDICATOR             ((uint8_t)19U)
+#define VL53L8CX_MOTION_INDICATOR           ((uint8_t)19U)
 
 /**
  * @brief The following macro are used to define the 'type' of a checker.
@@ -83,12 +62,12 @@
  * thresholds.
  */
 
-#define VL53L8CX_IN_WINDOW        ((uint8_t)0U)
+#define VL53L8CX_IN_WINDOW          ((uint8_t)0U)
 #define VL53L8CX_OUT_OF_WINDOW        ((uint8_t)1U)
-#define VL53L8CX_LESS_THAN_EQUAL_MIN_CHECKER    ((uint8_t)2U)
-#define VL53L8CX_GREATER_THAN_MAX_CHECKER   ((uint8_t)3U)
+#define VL53L8CX_LESS_THAN_EQUAL_MIN_CHECKER ((uint8_t)2U)
+#define VL53L8CX_GREATER_THAN_MAX_CHECKER ((uint8_t)3U)
 #define VL53L8CX_EQUAL_MIN_CHECKER      ((uint8_t)4U)
-#define VL53L8CX_NOT_EQUAL_MIN_CHECKER      ((uint8_t)5U)
+#define VL53L8CX_NOT_EQUAL_MIN_CHECKER    ((uint8_t)5U)
 
 /**
  * @brief The following macro are used to define multiple checkers in the same
@@ -123,5 +102,94 @@ typedef struct {
   uint8_t   mathematic_operation;
 } VL53L8CX_DetectionThresholds;
 
+/**
+ * @brief This function allows indicating if the detection thresholds are
+ * enabled.
+ * @param (VL53L8CX_Configuration) *p_dev : VL53L8CX configuration structure.
+ * @param (uint8_t) *p_enabled : Set to 1 if enabled, or 0 if disable.
+ * @return (uint8_t) status : 0 if OK
+ */
+
+uint8_t vl53l8cx_get_detection_thresholds_enable(
+  VL53L8CX_Configuration    *p_dev,
+  uint8_t       *p_enabled);
+
+/**
+ * @brief This function allows enable the detection thresholds.
+ * @param (VL53L8CX_Configuration) *p_dev : VL53L8CX configuration structure.
+ * @param (uint8_t) enabled : Set to 1 to enable, or 0 to disable thresholds.
+ * @return (uint8_t) status : 0 if programming is OK
+ */
+
+uint8_t vl53l8cx_set_detection_thresholds_enable(
+  VL53L8CX_Configuration    *p_dev,
+  uint8_t       enabled);
+
+/**
+ * @brief This function allows getting the detection thresholds.
+ * @param (VL53L8CX_Configuration) *p_dev : VL53L8CX configuration structure.
+ * @param (VL53L8CX_DetectionThresholds) *p_thresholds : Array of 64 thresholds.
+ * @return (uint8_t) status : 0 if programming is OK
+ */
+
+uint8_t vl53l8cx_get_detection_thresholds(
+  VL53L8CX_Configuration    *p_dev,
+  VL53L8CX_DetectionThresholds  *p_thresholds);
+
+/**
+ * @brief This function allows programming the detection thresholds.
+ * @param (VL53L8CX_Configuration) *p_dev : VL53L8CX configuration structure.
+ * @param (VL53L8CX_DetectionThresholds) *p_thresholds :  Array of 64 thresholds.
+ * @return (uint8_t) status : 0 if programming is OK
+ */
+
+uint8_t vl53l8cx_set_detection_thresholds(
+  VL53L8CX_Configuration    *p_dev,
+  VL53L8CX_DetectionThresholds  *p_thresholds);
+
+/**
+ * @brief This function is used to enable or disable the auto-stop feature.
+ * When ToF runs in autonomous mode with detection threshold, the sensor
+ * only emits an interrupt (INT pin) when a threshold is reached. Interrupt
+ * is raised when the measurement is completed. It is possible to abort the ranging
+ * without waiting for end of measurement completed by enabling the auto-stop. The
+ * sensor emits an interrupt and quickly aborts the measurements in progress. Please
+ * note that vl53l8cx_stop_ranging() function needs to be used after interrupt raised
+ * for a clean stop.
+ * This function is used to get the auto_stop flag.
+ * @param (VL53L8CX_Configuration) *p_dev : VL53L8CX configuration structure.
+ * @param (uint8_t) *p_auto_stop :  Pointer of auto-stop feature, 0 disabled
+ * (default) or 1 enabled.
+ * @return (uint8_t) status : 0 if programming is OK
+ */
+
+uint8_t vl53l8cx_get_detection_thresholds_auto_stop(
+  VL53L8CX_Configuration    *p_dev,
+  uint8_t       *p_auto_stop);
+
+/**
+ * @brief This function is used to enable or disable the auto-stop feature.
+ * When ToF runs in autonomous mode with detection threshold, the sensor
+ * only emits an interrupt (INT pin) when a threshold is reached. Interrupt
+ * is raised when the measurement is completed. It is possible to abort the ranging
+ * without waiting for end of measurement completed by enabling the auto-stop. The
+ * sensor emits an interrupt and quickly aborts the measurements in progress. Please
+ * note that vl53l8cx_stop_ranging() function needs to be used after interrupt raised
+ * for a clean stop.
+ * This function is used to set the auto_stop flag.
+ * @param (VL53L8CX_Configuration) *p_dev : VL53L8CX configuration structure.
+ * @param (uint8_t) *p_auto_stop :  Pointer of auto-stop feature, 0 disabled
+ * (default) or 1 enabled.
+ * @return (uint8_t) status : 0 if programming is OK
+ */
+
+uint8_t vl53l8cx_set_detection_thresholds_auto_stop(
+  VL53L8CX_Configuration    *p_dev,
+  uint8_t       auto_stop);
+
+
+#ifdef __cplusplus
+}
+#endif
 
 #endif /* VL53L8CX_PLUGIN_DETECTION_THRESHOLDS_H_ */
