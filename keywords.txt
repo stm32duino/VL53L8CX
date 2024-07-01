@@ -37,6 +37,10 @@ get_target_order	KEYWORD2
 set_target_order	KEYWORD2
 get_ranging_mode	KEYWORD2
 set_ranging_mode	KEYWORD2
+get_external_sync_pin_enable	KEYWORD2
+set_external_sync_pin_enable	KEYWORD2
+get_VHV_repeat_count	KEYWORD2
+set_VHV_repeat_count	KEYWORD2
 dci_read_data	KEYWORD2
 dci_write_data	KEYWORD2
 dci_replace_data	KEYWORD2
@@ -44,7 +48,9 @@ get_detection_thresholds_enable	KEYWORD2
 set_detection_thresholds_enable	KEYWORD2
 get_detection_thresholds	KEYWORD2
 set_detection_thresholds	KEYWORD2
-motion_indicator_init	KEYWORD2
+get_detection_thresholds_auto_stop	KEYWORD2
+set_detection_thresholds_auto_stop
+motion_indicator_init	KEYWORD2	KEYWORD2
 motion_indicator_set_distance_motion	KEYWORD2
 motion_indicator_set_resolution	KEYWORD2
 calibrate_xtalk	KEYWORD2
