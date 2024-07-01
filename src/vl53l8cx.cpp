@@ -81,7 +81,7 @@ VL53L8CX::~VL53L8CX() {}
 
 /**
   * @brief  Initialize the pins of the sensor
-  * @return Status 0 if check is OK. 
+  * @return Status 0 if check is OK.
   */
 int VL53L8CX::begin()
 {
@@ -110,7 +110,7 @@ int VL53L8CX::begin()
 
 /**
   * @brief  Deinitialize the pins of the sensor
-  * @return Status 0 if check is OK. 
+  * @return Status 0 if check is OK.
   */
 int VL53L8CX::end()
 {
