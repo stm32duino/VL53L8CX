@@ -47,9 +47,9 @@
  * pin 6 (MCLK_SCL) of the VL53L8CX satellite connected to pin D3 (MCLK_SCL) of the Nucleo board
  * pin 7 (PWREN) of the VL53L8CX satellite connected to pin D11 of the Nucleo board
  * pin 8 (I0VDD) of the VL53L8CX satellite not connected
- * pin 9 (3V3) of the VL53L8CX satellite connected to 3V3 of the Nucleo board
+ * pin 9 (3V3) of the VL53L8CX satellite not connected
  * pin 10 (1V8) of the VL53L8CX satellite not connected
- * pin 11 (5V) of the VL53L8CX satellite not connected
+ * pin 11 (5V) of the VL53L8CX satellite connected to 5V of the Nucleo board
  * GPIO1 of VL53L8CX satellite connected to A2 pin of the Nucleo board (not used)
  * GND of the VL53L8CX satellite connected to GND of the Nucleo board
  */
