@@ -370,7 +370,8 @@ typedef struct {
 
 } VL53L8CX_ResultsData;
 
-
+#ifndef BLOCK_HEADER
+#define BLOCK_HEADER
 union Block_header {
   uint32_t bytes;
   struct {
@@ -379,6 +380,7 @@ union Block_header {
     uint32_t idx : 16;
   };
 };
+#endif
 
 uint8_t vl53l8cx_is_alive(
   VL53L8CX_Configuration    *p_dev,

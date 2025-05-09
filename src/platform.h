@@ -52,16 +52,12 @@ extern "C" {
 #define VL53L8CX_COMMS_CHUNK_SIZE 4096
 #define SPI_WRITE_MASK(x) (uint16_t)(x | 0x8000)
 #define SPI_READ_MASK(x)  (uint16_t)(x & ~0x8000)
-#ifndef DEFAULT_I2C_BUFFER_LEN
-
-
-
 
 typedef uint8_t (*VL53L8CX_wait_Func)(void *, uint32_t);
 typedef uint8_t (*VL53L8CX_write_Func)(void *, uint16_t, uint8_t *, uint32_t);
 typedef uint8_t (*VL53L8CX_read_Func)(void *, uint16_t, uint8_t *, uint32_t);
 
-
+#ifndef DEFAULT_I2C_BUFFER_LEN
 #ifdef ARDUINO_SAM_DUE
 /* FIXME: It seems that an I2C buffer of BUFFER_LENGTH does not work on Arduino DUE. So, we need to decrease the size */
 #define DEFAULT_I2C_BUFFER_LEN (BUFFER_LENGTH - 2)
