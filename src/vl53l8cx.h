@@ -272,9 +272,9 @@ class VL53L8CX {
     SPIClass *dev_spi;
 
     /* Configuration */
+    int cs_pin;
     int  lpn_pin;
     int i2c_rst_pin;
-    int cs_pin;
     uint32_t spi_speed;
 
     VL53L8CX_Configuration _dev;
