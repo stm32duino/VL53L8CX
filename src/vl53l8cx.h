@@ -222,7 +222,7 @@ class VL53L8CX {
       if (dev_spi) {
 
         uint8_t status = 0;
-        int32_t i = 0;
+        uint32_t i = 0;
         uint32_t position = 0;
         uint32_t data_size = 0;
         uint16_t    temp;

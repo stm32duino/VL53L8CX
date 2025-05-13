@@ -130,8 +130,8 @@ void loop()
 
 void print_result(VL53L8CX_ResultsData *Result)
 {
-  int8_t i, j, k, l;
-  uint8_t zones_per_line;
+  int8_t i, j, k;
+  uint8_t l, zones_per_line;
   uint8_t number_of_zones = res;
 
   zones_per_line = (number_of_zones == 16) ? 4 : 8;
