@@ -43,7 +43,7 @@
 #include "Arduino.h"
 #include "Wire.h"
 #include "SPI.h"
-#include "platform.h"
+#include "vl53l8cx_platform.h"
 #include "vl53l8cx_api.h"
 #include "vl53l8cx_plugin_detection_thresholds.h"
 #include "vl53l8cx_plugin_motion_indicator.h"

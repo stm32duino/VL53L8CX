@@ -1,10 +1,10 @@
 /**
  ******************************************************************************
- * @file    platform_config_default.h
+ * @file    vl53l8cx_platform.h
  * @author  STMicroelectronics
  * @version V1.0.0
  * @date    11 November 2021
- * @brief   Header file with the default platform settings.
+ * @brief   Header file of the platform dependent structures.
  ******************************************************************************
  * @attention
  *
@@ -35,49 +35,80 @@
  ******************************************************************************
  */
 
-#ifndef _PLATFORM_CONFIG_DEFAULT_H_
-#define _PLATFORM_CONFIG_DEFAULT_H_
+#ifndef _VL53L8CX_PLATFORM_H_
+#define _VL53L8CX_PLATFORM_H_
 
-/*
- * @brief If you want to customize these defines you can add in the application
- * code the file platform_config_custom.h file where you can override some of
- * these defines.
- */
-
-/*
- * @brief The macro below is used to define the number of target per zone sent
- * through I2C. This value can be changed by user, in order to tune I2C
- * transaction, and also the total memory size (a lower number of target per
- * zone means a lower RAM). The value must be between 1 and 4.
- */
-
-#ifndef VL53L8CX_NB_TARGET_PER_ZONE
-  #define   VL53L8CX_NB_TARGET_PER_ZONE   1U
+#ifdef __cplusplus
+extern "C" {
 #endif
 
-/*
- * @brief The macro below can be used to avoid data conversion into the driver.
- * By default there is a conversion between firmware and user data. Using this macro
- * allows to use the firmware format instead of user format. The firmware format allows
- * an increased precision.
- */
 
-// #define  VL53L8CX_USE_RAW_FORMAT
+#pragma once
 
-/*
- * @brief All macro below are used to configure the sensor output. User can
- * define some macros if he wants to disable selected output, in order to reduce
- * I2C access.
- */
+#include <stdint.h>
+#include <string.h>
+#include "vl53l8cx_platform_config.h"
 
-//  #define VL53L8CX_DISABLE_AMBIENT_PER_SPAD
-//  #define VL53L8CX_DISABLE_NB_SPADS_ENABLED
-//  #define VL53L8CX_DISABLE_NB_TARGET_DETECTED
-//  #define VL53L8CX_DISABLE_SIGNAL_PER_SPAD
-//  #define VL53L8CX_DISABLE_RANGE_SIGMA_MM
-//  #define VL53L8CX_DISABLE_DISTANCE_MM
-//  #define VL53L8CX_DISABLE_REFLECTANCE_PERCENT
-//  #define VL53L8CX_DISABLE_TARGET_STATUS
-//  #define VL53L8CX_DISABLE_MOTION_INDICATOR
+#define VL53L8CX_COMMS_CHUNK_SIZE 4096
+#define SPI_WRITE_MASK(x) (uint16_t)(x | 0x8000)
+#define SPI_READ_MASK(x)  (uint16_t)(x & ~0x8000)
 
-#endif  // _PLATFORM_CONFIG_DEFAULT_H_
+typedef uint8_t (*VL53L8CX_wait_Func)(void *, uint32_t);
+typedef uint8_t (*VL53L8CX_write_Func)(void *, uint16_t, uint8_t *, uint32_t);
+typedef uint8_t (*VL53L8CX_read_Func)(void *, uint16_t, uint8_t *, uint32_t);
+
+#ifndef DEFAULT_I2C_BUFFER_LEN
+#ifdef ARDUINO_SAM_DUE
+/* FIXME: It seems that an I2C buffer of BUFFER_LENGTH does not work on Arduino DUE. So, we need to decrease the size */
+#define DEFAULT_I2C_BUFFER_LEN (BUFFER_LENGTH - 2)
+#else
+#ifdef BUFFER_LENGTH
+#define DEFAULT_I2C_BUFFER_LEN BUFFER_LENGTH
+#else
+#define DEFAULT_I2C_BUFFER_LEN 32
+#endif
+#endif
+#endif
+typedef struct {
+  uint16_t  address;
+  VL53L8CX_write_Func Write;
+  VL53L8CX_read_Func Read;
+  VL53L8CX_wait_Func Wait;
+  void *handle;
+} VL53L8CX_Platform;
+
+
+uint8_t VL53L8CX_RdByte(
+  VL53L8CX_Platform *p_platform,
+  uint16_t RegisterAddress,
+  uint8_t *p_value);
+
+uint8_t VL53L8CX_WrByte(
+  VL53L8CX_Platform *p_platform,
+  uint16_t RegisterAddress,
+  uint8_t value);
+
+uint8_t VL53L8CX_WrMulti(
+  VL53L8CX_Platform *p_platform,
+  uint16_t RegisterAddress,
+  uint8_t *p_values,
+  uint32_t size);
+
+uint8_t VL53L8CX_RdMulti(
+  VL53L8CX_Platform *p_platform,
+  uint16_t RegisterAddress,
+  uint8_t *p_values,
+  uint32_t size);
+
+uint8_t VL53L8CX_WaitMs(
+  VL53L8CX_Platform *p_platform,
+  uint32_t TimeMs);
+void VL53L8CX_SwapBuffer(
+  uint8_t     *buffer,
+  uint16_t     size);
+
+#ifdef __cplusplus
+}
+#endif
+
+#endif  // _VL53L8CX_PLATFORM_H_

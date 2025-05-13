@@ -23,7 +23,7 @@ extern "C" {
 
 
 
-#include "platform.h"
+#include "vl53l8cx_platform.h"
 
 /**
  * @brief Current driver version.
@@ -274,7 +274,7 @@ extern "C" {
  */
 
 typedef struct {
-  /* Platform, filled by customer into the 'platform.h' file */
+  /* Platform, filled by customer into the 'vl53l8cx_platform.h' file */
   VL53L8CX_Platform platform;
   /* Results streamcount, value auto-incremented at each range */
   uint8_t           streamcount;

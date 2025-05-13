@@ -45,7 +45,7 @@ static uint8_t _vl53l8cx_poll_for_answer(
 
 /*
  * Inner function, not available outside this file. This function is used to
- * program the output using the macro defined into the 'platform.h' file.
+ * program the output using the macro defined into the 'vl53l8cx_platform.h' file.
  */
 
 static uint8_t _vl53l8cx_program_output_config(

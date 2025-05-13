@@ -19,7 +19,7 @@
 extern "C" {
 #endif
 
-#include "platform.h"
+#include "vl53l8cx_platform.h"
 
 /**
  * @brief Inner internal number of targets.

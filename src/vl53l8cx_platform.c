@@ -1,6 +1,6 @@
 /**
  ******************************************************************************
- * @file    platform.cpp
+ * @file    vl53l8cx_platform.cpp
  * @author  STMicroelectronics
  * @version V1.0.0
  * @date    11 November 2021
@@ -36,7 +36,7 @@
  */
 
 
-#include "platform.h"
+#include "vl53l8cx_platform.h"
 
 
 uint8_t VL53L8CX_RdByte(
