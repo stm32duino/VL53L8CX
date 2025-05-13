@@ -155,7 +155,6 @@ class VL53L8CX {
         return i != size;
       }
       if (dev_spi) {
-        uint8_t status = 0;
         uint32_t position = 0;
         uint32_t data_size = 0;
         uint16_t    temp;
