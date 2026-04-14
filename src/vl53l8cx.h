@@ -179,6 +179,7 @@ class VL53L8CX {
             *(p_values + i + position) = dev_spi->transfer(0x00);
           }
           digitalWrite(cs_pin, HIGH);
+          dev_spi->endTransaction();
         }
         return 0;
       }
@@ -248,6 +249,7 @@ class VL53L8CX {
           digitalWrite(cs_pin, LOW);
           dev_spi->transfer(&data_write, data_size);
           digitalWrite(cs_pin, HIGH);
+          dev_spi->endTransaction();
         }
         return status;
       }
