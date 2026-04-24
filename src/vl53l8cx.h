@@ -52,8 +52,8 @@
 /* Class Declaration ---------------------------------------------------------*/
 class VL53L8CX {
   public:
-    VL53L8CX(TwoWire *i2c, int lpn_pin, int i2c_rst_pin = -1);
-    VL53L8CX(SPIClass *spi, int cs_pin, int lpn_pin = -1, int i2c_rst_pin = -1, uint32_t spi_speed = 5000000);
+    VL53L8CX(TwoWire *i2c, int lpn_pin, int i2c_rst_pin = -1, int int_pin = -1);
+    VL53L8CX(SPIClass *spi, int cs_pin, int lpn_pin = -1, int i2c_rst_pin = -1, int int_pin = -1, uint32_t spi_speed = 5000000);
     virtual ~VL53L8CX(void);
     virtual int begin(void);
     virtual int end(void);
@@ -275,8 +275,9 @@ class VL53L8CX {
 
     /* Configuration */
     int cs_pin;
-    int  lpn_pin;
+    int lpn_pin;
     int i2c_rst_pin;
+    int int_pin;
     uint32_t spi_speed;
 
     VL53L8CX_Configuration _dev;

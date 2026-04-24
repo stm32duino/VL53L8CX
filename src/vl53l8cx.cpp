@@ -44,8 +44,12 @@
   * @param i2c device I2C to be used for communication
   * @param _lpn_pin pin to be used as component LPn
   * @param _i2c_rst_pin pin to be used as component I2C_RST
+  * @param _int_pin pin connected to the sensor INT/GPIO1 line (active LOW, data-ready signal).
+  *        Pass -1 (default) to disable; check_data_ready() will poll over I2C instead.
+  *        When set, begin() configures the pin as INPUT_PULLUP and check_data_ready()
+  *        reads the pin state directly, avoiding an I2C transaction per call.
   */
-VL53L8CX::VL53L8CX(TwoWire *i2c, int _lpn_pin, int _i2c_rst_pin): dev_i2c(i2c), lpn_pin(_lpn_pin), i2c_rst_pin(_i2c_rst_pin)
+VL53L8CX::VL53L8CX(TwoWire *i2c, int _lpn_pin, int _i2c_rst_pin, int _int_pin): dev_i2c(i2c), lpn_pin(_lpn_pin), i2c_rst_pin(_i2c_rst_pin), int_pin(_int_pin)
 {
   memset((void *)&_dev, 0x0, sizeof(VL53L8CX_Configuration));
   dev_spi = NULL;
@@ -61,9 +65,13 @@ VL53L8CX::VL53L8CX(TwoWire *i2c, int _lpn_pin, int _i2c_rst_pin): dev_i2c(i2c), 
   * @param _cs_pin the chip select pin
   * @param _lpn_pin pin to be used as component LPn
   * @param _i2c_rst_pin pin to be used as component I2C_RST
+  * @param _int_pin pin connected to the sensor INT/GPIO1 line (active LOW, data-ready signal).
+  *        Pass -1 (default) to disable; check_data_ready() will poll over SPI instead.
+  *        When set, begin() configures the pin as INPUT_PULLUP and check_data_ready()
+  *        reads the pin state directly, avoiding a bus transaction per call.
   * @param _spi_speed the SPI speed in Hz
   */
-VL53L8CX::VL53L8CX(SPIClass *spi, int _cs_pin, int _lpn_pin, int _i2c_rst_pin, uint32_t _spi_speed)  : dev_spi(spi), cs_pin(_cs_pin), lpn_pin(_lpn_pin), i2c_rst_pin(_i2c_rst_pin),  spi_speed(_spi_speed)
+VL53L8CX::VL53L8CX(SPIClass *spi, int _cs_pin, int _lpn_pin, int _i2c_rst_pin, int _int_pin, uint32_t _spi_speed)  : dev_spi(spi), cs_pin(_cs_pin), lpn_pin(_lpn_pin), i2c_rst_pin(_i2c_rst_pin), int_pin(_int_pin), spi_speed(_spi_speed)
 {
   memset((void *)&_dev, 0x0, sizeof(VL53L8CX_Configuration));
   dev_i2c = NULL;
@@ -104,6 +112,9 @@ int VL53L8CX::begin()
     // Configure CS pin
     pinMode(cs_pin, OUTPUT);
     digitalWrite(cs_pin, HIGH);
+  }
+  if (int_pin >= 0) {
+    pinMode(int_pin, INPUT_PULLUP);
   }
   return 0;
 }
@@ -242,6 +253,10 @@ uint8_t VL53L8CX::stop_ranging(void)
   */
 uint8_t VL53L8CX::check_data_ready(uint8_t *p_isReady)
 {
+  if (int_pin >= 0) {
+    *p_isReady = (digitalRead(int_pin) == LOW) ? 1 : 0;
+    return VL53L8CX_STATUS_OK;
+  }
   return vl53l8cx_check_data_ready(p_dev, p_isReady);
 }
 

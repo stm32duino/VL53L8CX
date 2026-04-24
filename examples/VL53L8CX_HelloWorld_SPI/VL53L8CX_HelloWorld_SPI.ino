@@ -50,7 +50,7 @@
  * pin 9 (3V3) of the VL53L8CX satellite not connected
  * pin 10 (1V8) of the VL53L8CX satellite not connected
  * pin 11 (5V) of the VL53L8CX satellite connected to 5V of the Nucleo board
- * GPIO1 of VL53L8CX satellite connected to A2 pin of the Nucleo board (not used)
+ * GPIO1 of VL53L8CX satellite connected to A2 pin of the Nucleo board (used in INT pin mode)
  * GND of the VL53L8CX satellite connected to GND of the Nucleo board
  */
 
@@ -67,6 +67,10 @@
 #define SPI_MISO_PIN  5
 #define SPI_MOSI_PIN 4
 #define CS_PIN 10
+#define INT_PIN A2
+
+// Uncomment to use INT pin mode instead of polling over SPI
+// #define USE_INT_PIN
 
 SPIClass DEV_SPI(SPI_MOSI_PIN, SPI_MISO_PIN, SPI_CLK_PIN);
 
@@ -75,7 +79,11 @@ void clear_screen(void);
 void handle_cmd(uint8_t cmd);
 void display_commands_banner(void);
 
-VL53L8CX sensor_vl53l8cx_top(&DEV_SPI, CS_PIN);
+#ifdef USE_INT_PIN
+  VL53L8CX sensor_vl53l8cx_top(&DEV_SPI, CS_PIN, -1, -1, INT_PIN);
+#else
+  VL53L8CX sensor_vl53l8cx_top(&DEV_SPI, CS_PIN);
+#endif
 
 bool EnableAmbient = false;
 bool EnableSignal = false;
