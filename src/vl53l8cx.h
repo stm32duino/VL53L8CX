@@ -55,7 +55,7 @@ class VL53L8CX {
     VL53L8CX(TwoWire *i2c, int lpn_pin, int i2c_rst_pin = -1);
     VL53L8CX(SPIClass *spi, int cs_pin, int lpn_pin = -1, int i2c_rst_pin = -1, uint32_t spi_speed = 5000000);
     virtual ~VL53L8CX(void);
-    virtual int begin(void);
+    virtual int begin(uint16_t new_i2c_address = VL53L8CX_DEFAULT_I2C_ADDRESS);
     virtual int end(void);
     virtual void on(void);
     virtual void off(void);

@@ -80,10 +80,11 @@ VL53L8CX::VL53L8CX(SPIClass *spi, int _cs_pin, int _lpn_pin, int _i2c_rst_pin, u
 VL53L8CX::~VL53L8CX() {}
 
 /**
-  * @brief  Initialize the pins of the sensor
+  * @brief Initialize the pins of the sensor
+  * @param new_i2c_address The new I2C address to be set for the sensor.
   * @return Status 0 if check is OK.
   */
-int VL53L8CX::begin()
+int VL53L8CX::begin(uint16_t new_i2c_address)
 {
   if (lpn_pin >= 0) {
     pinMode(lpn_pin, OUTPUT);
@@ -105,6 +106,7 @@ int VL53L8CX::begin()
     pinMode(cs_pin, OUTPUT);
     digitalWrite(cs_pin, HIGH);
   }
+  _dev.platform.address = new_i2c_address;
   return 0;
 }
 
